@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "406721373866",
+    "project_id": "doublepick-afa80",
+    "storage_bucket": "doublepick-afa80.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406721373866:android:be827d8d172480017ed2d3",
+        "android_client_info": {
+          "package_name": "com.doublepick"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFSgyMSQcnLmcYnbC8jacjwOni4Eg7se8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
