@@ -72,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _initConnectivityWatch();
     _checkReferralLink();
 
+    Timer.periodic(const Duration(minutes: 3), (_) {
+      if (mounted && canWatchAd && !isRewardReady) {
+        _loadRewarded();
+      }
+    });
 
   }
 
