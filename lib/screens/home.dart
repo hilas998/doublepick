@@ -56,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<DocumentSnapshot>? _roundSub;
 
   bool _roundHandledForThisCycle = false;
+  bool _tipsClearedForThisRound = false;
+
 
 
 
@@ -268,6 +270,12 @@ class _HomeScreenState extends State<HomeScreen> {
       targetTime = scoreCalcEndTime;
       _applyResultsIfAvailableOnce();
 
+      // 🔥 Ovdje brišemo tipove čim prođe scoreCalcEndTime
+      if (now >= scoreCalcEndTime && !_tipsClearedForThisRound) {
+        _tipsClearedForThisRound = true;
+        await _clearUserTips();
+      }
+
       // ✅ kopiranje kad završi Results coming in
       if (!_roundHandledForThisCycle && now >= scoreCalcEndTime - 1000) {
         _roundHandledForThisCycle = true;
@@ -396,6 +404,30 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
   }
+
+
+  Future<void> _clearUserTips() async {
+    final users = await _firestore.collection('users').get();
+
+    for (var doc in users.docs) {
+      await doc.reference.update({
+        'tip1': FieldValue.delete(),
+        'tip2': FieldValue.delete(),
+        'tip3': FieldValue.delete(),
+        'tip4': FieldValue.delete(),
+      });
+    }
+
+    // reset local state for UI
+    setState(() {
+      hasSubmitted = false;
+      tip1Ctrl.clear();
+      tip2Ctrl.clear();
+      tip3Ctrl.clear();
+      tip4Ctrl.clear();
+    });
+  }
+
 
   // === Reklame, internet, referral ===
   void _initAds() {

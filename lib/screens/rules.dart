@@ -19,7 +19,7 @@ class _RulesScreenState extends State<RulesScreen> {
 
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // testni ID
+      adUnitId: 'ca-app-pub-6791458589312613/3522917422', 
       size: AdSize.banner,
       request: const AdRequest(),
       listener: const BannerAdListener(),

@@ -25,14 +25,6 @@ dependencies:
   permission_handler: ^11.0.1
 
 
-
-
-
-
-
-
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -46,6 +38,7 @@ flutter:
   assets:
     - assets/images/logo_firme.png
     - assets/images/lodoapp.png
+    - ios/Runner/GoogleService-Info.plist
 
 flutter_icons:
   android: true

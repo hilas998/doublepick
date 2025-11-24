@@ -24,7 +24,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
 
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // test ID
+      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
       size: AdSize.banner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
