@@ -433,14 +433,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void _initAds() {
     _bannerAd = BannerAd(
       adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-6791458589312613/3522917422' // 🟢 tvoj Android banner ID
-          : 'ca-app-pub-6791458589312613/3240411048', // 🟣 tvoj iOS banner ID
-      size: AdSize.banner,
+          ? 'ca-app-pub-6791458589312613/3522917422'
+          : 'ca-app-pub-6791458589312613/3240411048',
+        size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
+
     _loadRewarded();
   }
+
+
+
+
 
   void _loadRewarded() {
     RewardedAd.load(
@@ -623,7 +628,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: _bannerAd == null
           ? null
-          : SizedBox(
+          : Container(
+        alignment: Alignment.center,
         height: _bannerAd!.size.height.toDouble(),
         child: AdWidget(ad: _bannerAd!),
       ),

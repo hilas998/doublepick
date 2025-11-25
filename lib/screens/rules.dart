@@ -19,8 +19,8 @@ class _RulesScreenState extends State<RulesScreen> {
 
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-6791458589312613/3522917422', 
-      size: AdSize.banner,
+      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
+      size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
@@ -115,10 +115,12 @@ class _RulesScreenState extends State<RulesScreen> {
       ),
       bottomNavigationBar: _bannerAd == null
           ? null
-          : SizedBox(
+          : Container(
+        alignment: Alignment.center,
         height: _bannerAd!.size.height.toDouble(),
         child: AdWidget(ad: _bannerAd!),
       ),
+
     );
   }
 

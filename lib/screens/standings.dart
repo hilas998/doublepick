@@ -25,7 +25,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
   void _loadBanner() {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-6791458589312613/3522917422',
-      size: AdSize.banner,
+      size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
@@ -170,10 +170,11 @@ class _StandingsScreenState extends State<StandingsScreen> {
           ),
           const SizedBox(height: 10),
           if (_bannerAd != null)
-            SizedBox(
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
-            ),
+             Container(
+                 alignment: Alignment.center,
+                 height: _bannerAd!.size.height.toDouble(),
+                 child: AdWidget(ad: _bannerAd!),
+             ),
         ],
       ),
     );
