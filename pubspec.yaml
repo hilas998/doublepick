@@ -23,6 +23,8 @@ dependencies:
   flutter_local_notifications: ^17.1.0
   device_info_plus: ^10.1.0
   permission_handler: ^11.0.1
+  sign_in_with_apple: ^6.0.0
+
 
 
 dev_dependencies:

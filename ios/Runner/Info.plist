@@ -3,7 +3,6 @@
 <plist version="1.0">
 <dict>
 
-    <!-- Basic App Info -->
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
 
@@ -28,31 +27,25 @@
     <key>CFBundleShortVersionString</key>
     <string>$(FLUTTER_BUILD_NAME)</string>
 
-    <key>CFBundleSignature</key>
-    <string>????</string>
-
     <key>CFBundleVersion</key>
     <string>$(FLUTTER_BUILD_NUMBER)</string>
 
-
-    <!-- iPhone -->
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
-    <!-- Supported Device Types -->
+    <!-- iPhone + iPad support -->
     <key>UIDeviceFamily</key>
     <array>
-        <integer>1</integer>
+        <integer>1</integer> <!-- iPhone -->
+        <integer>2</integer> <!-- iPad -->
     </array>
 
-    <!-- Launch Screen -->
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 
     <key>UIMainStoryboardFile</key>
     <string>Main</string>
 
-    <!-- Orientation -->
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -60,29 +53,23 @@
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
 
-
-    <!-- Remove frame drops on iPhone -->
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
 
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
 
-
     <!-- AdMob -->
     <key>GADApplicationIdentifier</key>
     <string>ca-app-pub-6791458589312613~7158532806</string>
 
-
-    <!-- Tracking Permission -->
+    <!-- Tracking permission -->
     <key>NSUserTrackingUsageDescription</key>
     <string>This app uses tracking to show relevant ads and improve experience.</string>
 
-
-    <!-- Notifications -->
-    <key>NSUserNotificationUsageDescription</key>
-    <string>DoublePick needs permission to send notifications.</string>
-
+    <!-- Firebase -->
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <true/>
 
     <!-- App Transport Security -->
     <key>NSAppTransportSecurity</key>
@@ -91,16 +78,28 @@
         <true/>
     </dict>
 
-
-    <!-- SKAdNetwork -->
+    <!-- SKAdNetwork IDs -->
     <key>SKAdNetworkItems</key>
     <array>
-        <dict>
-            <key>SKAdNetworkIdentifier</key>
-            <string>cstr6suwn9.skadnetwork</string>
-        </dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>cstr6suwn9.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>4fzdc2evr5.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>7ug5zh24hu.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>gta9lk7p23.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>v72qych5uu.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>8s468mfl3y.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>3qy4746246.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>52fl2v3hgk.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>u679fj5vs4.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>su67r6k2v3.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>yclnxrl5pm.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>pwa73g5rt2.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>qqp299437u.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>578prtvx9j.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>v4nxqhlyqp.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>wzmmz9fp6w.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>mlmmfzh3r3.skadnetwork</string></dict>
+        <dict><key>SKAdNetworkIdentifier</key><string>424m5254lk.skadnetwork</string></dict>
     </array>
-
 
     <!-- App Icon -->
     <key>CFBundleIcons</key>

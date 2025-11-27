@@ -137,16 +137,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   void _initializeLocalNotifications() async {
     const AndroidInitializationSettings android =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings settings =
-    InitializationSettings(android: android);
+    const DarwinInitializationSettings ios = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings settings = InitializationSettings(
+      android: android,
+      iOS: ios,
+    );
 
     await _localNoti.initialize(settings);
   }
+
+
   Future<void> _showAdAvailableNotification() async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'ad_channel',               // kanal ID
@@ -165,6 +174,11 @@ class _HomeScreenState extends State<HomeScreen> {
       notifDetails,
     );
   }
+
+
+
+
+
 
 
   // 🔹 Učitavanje korisnika i tipova
