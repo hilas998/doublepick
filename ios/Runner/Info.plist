@@ -33,11 +33,11 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
-    <!-- iPhone + iPad support -->
+    <!-- iPhone support -->
     <key>UIDeviceFamily</key>
     <array>
         <integer>1</integer> <!-- iPhone -->
-        <integer>2</integer> <!-- iPad -->
+
     </array>
 
     <key>UILaunchStoryboardName</key>
