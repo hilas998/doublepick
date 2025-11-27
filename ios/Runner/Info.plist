@@ -33,12 +33,17 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
-    <!-- iPhone support -->
-    <key>UIDeviceFamily</key>
-    <array>
-        <integer>1</integer> <!-- iPhone -->
 
-    </array>
+<!-- iPhone only -->
+<key>UIDeviceFamily</key>
+<array>
+    <integer>1</integer> <!-- iPhone -->
+</array>
+
+<!-- Force full-screen (required to skip iPad multitasking rules) -->
+<key>UIRequiresFullScreen</key>
+<true/>
+
 
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
