@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? timer;
   String phaseText = '';
 
-  BannerAd? _bannerAd;
+ // BannerAd? _bannerAd;
   RewardedAd? _rewardedAd;
   bool isRewardReady = false;
   bool canWatchAd = true;
@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeLocalNotifications();
     _loadUser();
     _loadMatchAndTimer();
-    _initAds();
+    //_initAds();
     _checkCooldown();
     _initConnectivityWatch();
     _checkReferralLink();
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _connSub.cancel();
-    _bannerAd?.dispose();
+    //_bannerAd?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
@@ -430,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // === Reklame, internet, referral ===
-  void _initAds() {
+  /*void _initAds() {
     _bannerAd = BannerAd(
       adUnitId: Platform.isAndroid
           ? 'ca-app-pub-6791458589312613/3522917422'
@@ -442,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _loadRewarded();
   }
-
+*/
 
 
 
@@ -626,13 +626,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _bannerAd == null
-          ? null
-          : Container(
-        alignment: Alignment.center,
-        height: _bannerAd!.size.height.toDouble(),
-        child: AdWidget(ad: _bannerAd!),
-      ),
+      bottomNavigationBar:  null
+
     );
   }
 

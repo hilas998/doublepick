@@ -11,25 +11,25 @@ class StandingsScreen extends StatefulWidget {
 }
 
 class _StandingsScreenState extends State<StandingsScreen> {
-  BannerAd? _bannerAd;
+ // BannerAd? _bannerAd;
   List<Map<String, dynamic>> _users = [];
   int? _myPosition;
 
   @override
   void initState() {
     super.initState();
-    _loadBanner();
+    //_loadBanner();
     _loadLeaderboard();
   }
 
-  void _loadBanner() {
+ /* void _loadBanner() {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-6791458589312613/3522917422',
       size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
-  }
+  }*/
 
   Future<void> _loadLeaderboard() async {
     final db = FirebaseFirestore.instance;
@@ -67,7 +67,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
+   // _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -169,12 +169,6 @@ class _StandingsScreenState extends State<StandingsScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          if (_bannerAd != null)
-             Container(
-                 alignment: Alignment.center,
-                 height: _bannerAd!.size.height.toDouble(),
-                 child: AdWidget(ad: _bannerAd!),
-             ),
         ],
       ),
     );

@@ -9,26 +9,26 @@ class RulesScreen extends StatefulWidget {
 }
 
 class _RulesScreenState extends State<RulesScreen> {
-  BannerAd? _bannerAd;
+  //BannerAd? _bannerAd;
 
   @override
   void initState() {
     super.initState();
-    _loadBanner();
+    //_loadBanner();
   }
 
-  void _loadBanner() {
+ /* void _loadBanner() {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-6791458589312613/3522917422',
       size: AdSize.largeBanner,
       request: const AdRequest(),
       listener: const BannerAdListener(),
     )..load();
-  }
+  }*/
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
+    //_bannerAd?.dispose();
     super.dispose();
   }
 
@@ -113,13 +113,9 @@ class _RulesScreenState extends State<RulesScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _bannerAd == null
-          ? null
-          : Container(
-        alignment: Alignment.center,
-        height: _bannerAd!.size.height.toDouble(),
-        child: AdWidget(ad: _bannerAd!),
-      ),
+      bottomNavigationBar:  null
+
+
 
     );
   }
