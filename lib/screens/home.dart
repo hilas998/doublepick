@@ -13,6 +13,9 @@ import 'package:flutter/services.dart';
 
 
 
+
+
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -41,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? timer;
   String phaseText = '';
 
- // BannerAd? _bannerAd;
+  BannerAd? _bannerAd;
   RewardedAd? _rewardedAd;
   bool isRewardReady = false;
   bool canWatchAd = true;
@@ -69,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeLocalNotifications();
     _loadUser();
     _loadMatchAndTimer();
-    //_initAds();
+    _initAds();
     _checkCooldown();
     _initConnectivityWatch();
     _checkReferralLink();
@@ -85,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _connSub.cancel();
-    //_bannerAd?.dispose();
+    _bannerAd?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
@@ -242,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (data?['scoreCalcEndTimeMillis'] ?? scoreCalcEndTime).toInt();
       });
 
-      await _applyResultsIfAvailableOnce();
+
       _updatePhase();
 
       if (data?['startTimeMillis'] != null) {
@@ -282,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (now < scoreCalcEndTime) {
       newPhase = "Results coming in";
       targetTime = scoreCalcEndTime;
-      _applyResultsIfAvailableOnce();
+
 
       // 🔥 Ovdje brišemo tipove čim prođe scoreCalcEndTime
       if (now >= scoreCalcEndTime && !_tipsClearedForThisRound) {
@@ -346,52 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAllResultsFilled() =>
       rez1.isNotEmpty && rez2.isNotEmpty && rez3.isNotEmpty && rez4.isNotEmpty;
 
-  Future<void> _applyResultsIfAvailableOnce() async {
-    if (!_isAllResultsFilled()) return;
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-    final userRef = _firestore.collection('users').doc(uid);
-    final userDoc = await userRef.get();
-    if (!userDoc.exists) return;
-    final markerKey = "scored_$_roundId";
-    if (userDoc.data()!.containsKey(markerKey) && userDoc[markerKey] == true) return;
 
-    final t1 = (userDoc.data()?['tip1'] ?? '').toString();
-    final t2 = (userDoc.data()?['tip2'] ?? '').toString();
-    final t3 = (userDoc.data()?['tip3'] ?? '').toString();
-    final t4 = (userDoc.data()?['tip4'] ?? '').toString();
-    if (t1.isEmpty || t2.isEmpty || t3.isEmpty || t4.isEmpty) {
-      await userRef.update({markerKey: true});
-      return;
-    }
-
-    int? tip1 = int.tryParse(t1);
-    int? tip2 = int.tryParse(t2);
-    int? tip3 = int.tryParse(t3);
-    int? tip4 = int.tryParse(t4);
-    int? r1 = int.tryParse(rez1);
-    int? r2 = int.tryParse(rez2);
-    int? r3 = int.tryParse(rez3);
-    int? r4 = int.tryParse(rez4);
-    if ([tip1, tip2, tip3, tip4, r1, r2, r3, r4].contains(null)) return;
-
-    int points = 0;
-    bool exact1 = _isExact(tip1!, tip2!, r1!, r2!);
-    bool exact2 = _isExact(tip3!, tip4!, r3!, r4!);
-    bool outcome1 = _sameOutcome(tip1, tip2, r1, r2);
-    bool outcome2 = _sameOutcome(tip3, tip4, r3, r4);
-
-    if (exact1) points += 15;
-    else if (outcome1) points += 5;
-    if (exact2) points += 15;
-    else if (outcome2) points += 5;
-    if (exact1 && exact2) points += 15;
-
-    final currentScore = int.tryParse(userDoc.data()?['score'] ?? '0') ?? 0;
-    final newScore = currentScore + points;
-    await userRef.update({'score': newScore.toString(), markerKey: true});
-    setState(() => score = newScore.toString());
-  }
 
   bool _isExact(int a, int b, int x, int y) => (a == x && b == y);
   bool _sameOutcome(int a, int b, int x, int y) {
@@ -429,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'tip2': FieldValue.delete(),
         'tip3': FieldValue.delete(),
         'tip4': FieldValue.delete(),
+        'roundScore': FieldValue.delete(),
       });
     }
 
@@ -444,20 +403,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // === Reklame, internet, referral ===
-  /*void _initAds() {
+
+
+  void _initAds() {
     _bannerAd = BannerAd(
       adUnitId: Platform.isAndroid
           ? 'ca-app-pub-6791458589312613/3522917422'
           : 'ca-app-pub-6791458589312613/3240411048',
-        size: AdSize.largeBanner,
+      size: AdSize.banner, // 🔥 MANJI I LJEPŠI BANNER
       request: const AdRequest(),
-      listener: const BannerAdListener(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
+      ),
     )..load();
 
     _loadRewarded();
   }
-*/
-
 
 
 
@@ -662,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person, color: Colors.black54, size: 20),
+                  const Icon(Icons.person, color: Colors.black, size: 20),
                   const SizedBox(width: 6),
                   Text(
                     "$name $surname",
@@ -686,12 +649,12 @@ class _HomeScreenState extends State<HomeScreen> {
           // Email
           Row(
             children: [
-              const Icon(Icons.email, color: Colors.black54, size: 20),
+              const Icon(Icons.email, color: Colors.black, size: 20),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   email,
-                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                  style: const TextStyle(fontSize: 15, color: Colors.black),
                 ),
               ),
             ],
@@ -733,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () => Navigator.pushNamed(context, '/standings'),
                 child: const Text(
-                  "Standings",
+                  "Standings Global",
                   style: TextStyle(
                     color: Colors.blue,
                     fontWeight: FontWeight.bold,
@@ -749,11 +712,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   minimumSize: Size(0, 0),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
+                onPressed: () => Navigator.pushNamed(context, '/roundStandings'),
+                child: const Text(
+                  "Standings Round ",
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: () => Navigator.pushNamed(context, '/rules'),
                 child: const Text(
                   "Rules of the game",
                   style: TextStyle(
-                    color: Colors.blueGrey,
+                    color: Colors.blue,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -776,6 +756,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              if (email == "salihlihic998@gmail.com")
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/admin'),
+                  child: const Text(
+                    "Admin panel",
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
+                ),
+
+
+
+
             ],
           ),
 
@@ -814,6 +806,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TextField(
                   controller: c1,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(1), // ograniči na 1 cifru
+                    FilteringTextInputFormatter.digitsOnly, // samo brojevi
+                  ],
                   decoration: const InputDecoration(labelText: "Home"),
                 ),
               ),
@@ -822,6 +818,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TextField(
                   controller: c2,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(1), // ograniči na 1 cifru
+                    FilteringTextInputFormatter.digitsOnly, // samo brojevi
+                  ],
                   decoration: const InputDecoration(labelText: "Away"),
                 ),
               ),
@@ -835,6 +835,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
 
   void _logout() async {
     await FirebaseAuth.instance.signOut();

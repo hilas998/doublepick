@@ -1,0 +1,176 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class FavoritesScreen extends StatefulWidget {
+  const FavoritesScreen({super.key});
+
+  @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  List<Map<String, dynamic>> _favorites = [];
+  List<Map<String, dynamic>> _global = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+    // Load favorites
+    final favSnap = await FirebaseFirestore.instance
+        .collection('favorites')
+        .doc(currentUserId)
+        .collection('favoritedUsers')
+        .get();
+
+    final favorites = favSnap.docs.map((doc) => doc.data()).toList();
+
+    // Load global users for ranking
+    final allSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .get();
+
+    final allUsers = allSnap.docs.map((doc) {
+      final data = doc.data();
+      final score = int.tryParse(data['score']?.toString() ?? '0') ?? 0;
+      return {
+        'uid': doc.id,
+        'ime': data['ime'] ?? '',
+        'prezime': data['prezime'] ?? '',
+        'email': data['email'] ?? '',
+        'score': score,
+      };
+    }).toList();
+
+    allUsers.sort((a, b) => b['score'].compareTo(a['score']));
+
+    // Match rank & score
+    for (var fav in favorites) {
+      final index = allUsers.indexWhere((u) => u['uid'] == fav['uid']);
+      fav['rank'] = index == -1 ? null : index + 1;
+      fav['score'] = index == -1 ? 0 : allUsers[index]['score'];
+    }
+
+    // Sort favorites by score too (top first)
+    favorites.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+    setState(() {
+      _favorites = favorites;
+      _global = allUsers;
+    });
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF022904),
+
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF022904),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF2ECC71)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'DoublePick',
+          style: TextStyle(
+            color: Colors.yellow,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+      ),
+
+      body: Column(
+        children: [
+          const SizedBox(height: 10),
+
+          const Text(
+            "MY FAVORITES",
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.yellow,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          Expanded(
+            child: _favorites.isEmpty
+                ? const Center(
+              child: Text(
+                "No favorites yet",
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _favorites.length,
+              itemBuilder: (context, index) {
+                final user = _favorites[index];
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow[200],
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ListTile(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        '/profile',
+                        arguments: user['uid'],
+                      );
+                    },
+                    leading: Text(
+                      "#${user['rank'] ?? '-'}",
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    title: Text(
+                      "${user['ime']} ${user['prezime']}",
+                      style: const TextStyle(
+                        fontSize: 17,
+                        color: Colors.black,
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          user['score'].toString(),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.star, color: Colors.orange),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+}

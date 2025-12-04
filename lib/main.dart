@@ -11,6 +11,16 @@ import 'screens/home.dart';
 import 'screens/rules.dart';
 import 'screens/standings.dart';
 import 'screens/forgot_password.dart';
+import 'screens/round_standings.dart';
+import 'screens/admin.dart';
+import 'screens/user_profile.dart';
+import 'screens/favorites_screen.dart';
+import 'screens/AdminLeague.dart';
+import 'screens/LeagueDetail.dart';
+import 'screens/MyLeagues.dart';
+
+
+
 
 // 🔹 GLOBAL KEY za navigaciju izvan widgeta
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -72,6 +82,20 @@ class MyApp extends StatelessWidget {
         '/standings': (context) => const StandingsScreen(),
         '/rules': (context) => const RulesScreen(),
         '/reset': (context) => const ForgotPasswordScreen(),
+        '/roundStandings': (context) => const RoundStandingsScreen(),
+        '/admin': (context) => const AdminScreen(),
+        '/favorites': (context) => const FavoritesScreen(),
+        '/myLeagues' : (context) => const MyLeaguesScreen(),
+        '/leagueDetail' : (context) => const LeagueDetailScreen(),
+        '/adminLeague' : (context) => const AdminLeagueScreen(),
+
+
+        '/profile': (context) {
+          final uid = ModalRoute.of(context)!.settings.arguments as String;
+          return UserProfileScreen(uid: uid);
+        },
+
+
       },
     );
   }

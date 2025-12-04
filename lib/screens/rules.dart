@@ -9,22 +9,26 @@ class RulesScreen extends StatefulWidget {
 }
 
 class _RulesScreenState extends State<RulesScreen> {
-  //BannerAd? _bannerAd;
+  BannerAd? _bannerAd;
 
   @override
   void initState() {
     super.initState();
-    //_loadBanner();
+    _loadBanner();
   }
 
- /* void _loadBanner() {
+  void _loadBanner() {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-6791458589312613/3522917422',
-      size: AdSize.largeBanner,
+      size: AdSize.banner, // 🔥 MANJI BANNER
       request: const AdRequest(),
-      listener: const BannerAdListener(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose(); // sprječava crash
+        },
+      ),
     )..load();
-  }*/
+  }
 
   @override
   void dispose() {
@@ -36,27 +40,22 @@ class _RulesScreenState extends State<RulesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF022904),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF022904),
-        centerTitle: true,
-        title: Text(
-          'DoublePick',
-          style: TextStyle(
-            color: Colors.yellow, // žuti naslov
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        actions: [
-          IconButton(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF022904),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF2ECC71)),
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Colors.red, // crvena ikona
+          ),
+          title: const Text(
+            'DoublePick',
+            style: TextStyle(
+              color: Colors.yellow,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
             ),
           ),
-        ],
-      ),
+        ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
@@ -88,7 +87,9 @@ class _RulesScreenState extends State<RulesScreen> {
                           "3️⃣ Correct outcome (win/draw/loss) gives 5 points.\n\n"
                           "4️⃣ If both matches have correct scores, you get +15 bonus points.\n\n"
                           "5️⃣ Each day you can watch one ad to get +2 bonus points.\n\n"
-                          "6️⃣ The leaderboard updates automatically after results are posted.",
+                          "6️⃣ The leaderboard updates automatically after results are posted.\n\n"
+                          "7️⃣ Each player can create only one league.\n\n"
+                          "8️⃣ The app is intended for fun and entertainment only, not for any form of gambling.\n\n",
                       style: TextStyle(
                         fontSize: 18,
                         height: 1.5,
@@ -96,20 +97,13 @@ class _RulesScreenState extends State<RulesScreen> {
                       ),
                       textAlign: TextAlign.left,
                     ),
+
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text("Nazad"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade700,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
+
           ],
         ),
       ),
