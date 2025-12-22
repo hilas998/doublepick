@@ -147,20 +147,21 @@ class _AdminLeagueScreenState extends State<AdminLeagueScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF022904),
+      backgroundColor: const Color(0xFF00150A), // tamno-zelena, prijatno
       appBar: AppBar(
-        backgroundColor: const Color(0xFF022904),
+        backgroundColor: const Color(0xFF00150A),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2ECC71)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'DoublePick',
           style: TextStyle(
-            color: Colors.yellow,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
           ),
         ),
         actions: [
@@ -173,7 +174,7 @@ class _AdminLeagueScreenState extends State<AdminLeagueScreen> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: _loading
             ? const Center(
           child: CircularProgressIndicator(color: Colors.yellow),
@@ -182,21 +183,25 @@ class _AdminLeagueScreenState extends State<AdminLeagueScreen> {
           children: [
             Text(
               _league?['name'] ?? 'Admin League',
-              style: const TextStyle(
-                color: Colors.yellow,
-                fontWeight: FontWeight.bold,
-                fontSize: 26,
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEFFF8A),
+                shadows: [
+                  Shadow(color: Colors.yellow, blurRadius: 12),
+                ],
               ),
             ),
+
             const SizedBox(height: 20),
             TextField(
               controller: _emailController,
               decoration: InputDecoration(
                 hintText: "Enter user email",
                 filled: true,
-                fillColor: Colors.yellow[100],
+                fillColor: Colors.yellow[100]?.withOpacity(0.85),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
                 suffixIcon: IconButton(
@@ -207,37 +212,63 @@ class _AdminLeagueScreenState extends State<AdminLeagueScreen> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: _league == null ||
-                  (_league!['members'] as List).isEmpty
+              child: _league == null || (_league!['members'] as List).isEmpty
                   ? const Center(
                 child: Text(
                   "No members yet",
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
                 ),
               )
                   : ListView.builder(
                 itemCount: (_league!['members'] as List).length,
                 itemBuilder: (context, index) {
-                  final member =
-                  (_league!['members'] as List)[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.yellow[200],
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: ListTile(
-                      title: Text(
-                        member['email'] ?? '',
-                        style: const TextStyle(
-                            color: Colors.black, fontSize: 16),
+                  final member = (_league!['members'] as List)[index];
+                  return TweenAnimationBuilder<double>(
+                    duration: Duration(milliseconds: 300 + index * 100),
+                    curve: Curves.easeOut,
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Transform.translate(
+                          offset: Offset(0, 50 * (1 - value)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.green.shade100.withOpacity(0.9),
+                            Colors.yellow.shade100.withOpacity(0.85)
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.greenAccent.withOpacity(0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete,
-                            color: Colors.red),
-                        onPressed: () => _removeMember(index),
+                      child: ListTile(
+                        title: Text(
+                          member['email'] ?? '',
+                          style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removeMember(index),
+                        ),
                       ),
                     ),
                   );
@@ -249,4 +280,5 @@ class _AdminLeagueScreenState extends State<AdminLeagueScreen> {
       ),
     );
   }
+
 }

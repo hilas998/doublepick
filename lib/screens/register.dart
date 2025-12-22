@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
+import 'invite_code.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -29,15 +30,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = _email.text.trim();
     final password = _password.text.trim();
 
+    String generateInviteCode(String uid) {
+      return uid.substring(0, 6).toUpperCase(); // uzimamo 6 karaktera iz UID
+    }
+
     if (ime.isEmpty) return _show("Enter name");
     if (prezime.isEmpty) return _show("Enter surname");
-    if (mobitel.isEmpty || mobitel.length < 9) {
-      return _show("Enter valid mobile number");
-    }
+
+
+    final mobRegex = RegExp(r"^[0-9]{9,15}$"); // minimalno 9, maksimalno 15 cifara
+    if (!mobRegex.hasMatch(mobitel)) return _show("Enter valid mobile number");
+
+
+    final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
+    if (!emailRegex.hasMatch(email)) return _show("Enter valid email");
+
+
     if (email.isEmpty || email.length < 12) return _show("Enter valid email");
-    if (password.isEmpty || password.length < 6) {
-      return _show("Password must be at least 6 characters");
+
+
+    final passwordRegex = RegExp(
+        r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$'
+    );
+
+    if (!passwordRegex.hasMatch(password)) {
+      return _show(
+          "Password must have at least 6 characters, including uppercase, lowercase and a special character (!@#\$%^&*)"
+      );
     }
+
+
+
+
+
+
+
+
 
     setState(() => _loading = true);
 
@@ -58,6 +86,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "score": "0",
         "referralUsed": false,
         "referredBy": null,
+        "inviteCode": generateInviteCode(uid),
+        "usedInviteCode": false,
+
       };
 
       await _fStore.collection("users").doc(uid).set(userData);
@@ -68,16 +99,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+            context,
+            MaterialPageRoute(builder: (_) => InviteCodeScreen(userId: uid))
         );
       }
+
     } on FirebaseAuthException catch (e) {
       _show("Error: ${e.message}");
     } finally {
       setState(() => _loading = false);
     }
   }
+
+  @override
+  void dispose() {
+    _ime.dispose();
+    _prezime.dispose();
+    _mobitel.dispose();
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
 
   Future<void> _tryRedeemReferral(String newUserId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -123,120 +166,148 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF022904),
+      backgroundColor: const Color(0xFF00150A),
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // ===== NASLOV ======
-              Container(
-                height: 80,
-                width: double.infinity,
-                alignment: Alignment.center,
-                child: const Text(
-                  "DoublePick",
-                  style: TextStyle(
-                    fontSize: 36,
-                    color: Colors.yellow,
-                    fontWeight: FontWeight.bold,
-                  ),
+              const SizedBox(height: 50),
+
+              // ===== TITLE =====
+              const Text(
+                "DoublePick",
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFEFFF8A),
+                  letterSpacing: 1.2,
                 ),
               ),
 
               const SizedBox(height: 40),
 
-              // ===== KARTICA ======
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  elevation: 4,
-                  color: const Color(0xFFFFF59D),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+              // ===== REGISTER CARD =====
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(26.0),
-                    child: Column(
-                      children: [
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            "Create account",
-                            style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF22E58B).withOpacity(0.45),
+                      blurRadius: 26,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(2.5),
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: Colors.white.withOpacity(0.92),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Create account",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF00150A),
                         ),
-                        const SizedBox(height: 20),
+                      ),
+                      const SizedBox(height: 20),
 
-                        _input(_ime, "Name", Icons.person),
-                        const SizedBox(height: 12),
+                      _input(_ime, Icons.person, hint: "Name"),
+                      const SizedBox(height: 14),
+                      _input(_prezime, Icons.person, hint: "Surname"),
+                      const SizedBox(height: 14),
+                      _input(
+                        _mobitel,
+                        Icons.phone,
+                        hint: "Mobile",
+                        type: TextInputType.number,
+                      ),
+                      const SizedBox(height: 14),
+                      _input(
+                        _email,
+                        Icons.email_outlined,
+                        hint: "Email",
+                        type: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 14),
+                      _input(
+                        _password,
+                        Icons.lock,
+                        hint: "Password",
+                        obscure: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-                        _input(_prezime, "Surname", Icons.person),
-                        const SizedBox(height: 12),
+              const SizedBox(height: 30),
 
-                        _input(_mobitel, "Mobile", Icons.phone,
-                            type: TextInputType.number),
-                        const SizedBox(height: 12),
-
-                        _input(_email, "Email", Icons.email),
-                        const SizedBox(height: 12),
-
-                        _input(_password, "Password", Icons.lock,
-                            obscure: true),
-                      ],
+              // ===== REGISTER BUTTON =====
+              _loading
+                  ? const CircularProgressIndicator(color: Color(0xFFEFFF8A))
+                  : GestureDetector(
+                onTap: _register,
+                child: Container(
+                  height: 58,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                        const Color(0xFF22E58B).withOpacity(0.5),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "CREATE ACCOUNT",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 26),
+              const SizedBox(height: 18),
 
-              // ===== CIRCLE REGISTER BUTTON =====
-              _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : GestureDetector(
-                onTap: _register,
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.yellow.shade700,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      )
-                    ],
-                  ),
-                  child:
-                  const Icon(Icons.arrow_forward, size: 36, color: Colors.black),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ===== BACK TO LOGIN =====
               TextButton(
                 onPressed: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginScreen()),
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
                   );
                 },
                 child: const Text(
                   "← Back to Login",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -249,23 +320,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ====== INPUT POLJA ======
-  Widget _input(TextEditingController c, String hint, IconData icon,
-      {bool obscure = false, TextInputType type = TextInputType.text}) {
-    return TextField(
-      controller: c,
-      obscureText: obscure,
-      keyboardType: type,
-      decoration: InputDecoration(
-        labelText: hint,
-        prefixIcon: Icon(icon, color: Colors.black),
-        filled: true,
-        fillColor: Colors.white,
-        labelStyle: const TextStyle(color: Colors.black87),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+  Widget _input(
+      TextEditingController controller,
+      IconData icon, {
+        required String hint,
+        bool obscure = false,
+        TextInputType type = TextInputType.text,
+      }) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF22E58B).withOpacity(0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Container(
+        margin: const EdgeInsets.all(2.2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+        ),
+        child: TextField(
+          controller: controller,
+          obscureText: obscure,
+          keyboardType: type,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF00150A),
+          ),
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            prefixIcon: Icon(icon, color: Color(0xFF22E58B)),
+            hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFF22E58B),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );
   }
+
+
+
 }

@@ -15,14 +15,18 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
   bool _loading = true;
 
   int? _myRoundPosition;
-
   BannerAd? _bannerAd;
+
+  // Dropdown
+  int _selectedRound = 1;
+  int _totalRounds = 1;
 
   @override
   void initState() {
     super.initState();
     _loadBanner();
-    _loadRoundStandings();
+    _loadTotalRounds();
+    _loadRoundStandings(_selectedRound);
   }
 
   void _loadBanner() {
@@ -38,98 +42,47 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
     )..load();
   }
 
-  Future<void> _loadRoundStandings() async {
+  Future<void> _loadTotalRounds() async {
+    final metaDoc = await FirebaseFirestore.instance.collection('meta').doc('config').get();
+    setState(() {
+      _totalRounds = metaDoc.data()?['currentRound'] ?? 1;
+    });
+  }
+
+  Future<void> _loadRoundStandings(int roundNumber) async {
+    setState(() => _loading = true);
+
     final db = FirebaseFirestore.instance;
+    final doc = await db.collection('rounds').doc('round_$roundNumber').get();
 
-    final roundDoc = await db.collection('timovi').doc('aktivni').get();
-    if (!roundDoc.exists) {
-      setState(() => _loading = false);
-      return;
-    }
-
-    final r = roundDoc.data()!;
-    String rez1 = r['stvarnirezultat1'] ?? "";
-    String rez2 = r['stvarnirezultat2'] ?? "";
-    String rez3 = r['stvarnirezultat3'] ?? "";
-    String rez4 = r['stvarnirezultat4'] ?? "";
-
-    if ([rez1, rez2, rez3, rez4].any((e) => e.isEmpty)) {
-      setState(() => _loading = false);
-      return;
-    }
-
-    int r1 = int.parse(rez1);
-    int r2 = int.parse(rez2);
-    int r3 = int.parse(rez3);
-    int r4 = int.parse(rez4);
-
-    final usersSnap = await db.collection('users').get();
-    List<Map<String, dynamic>> list = [];
-
-    for (var doc in usersSnap.docs) {
-      final d = doc.data();
-
-      String ime = d['ime'] ?? "";
-      String prezime = d['prezime'] ?? "";
-
-      String t1 = d['tip1']?.toString() ?? "";
-      String t2 = d['tip2']?.toString() ?? "";
-      String t3 = d['tip3']?.toString() ?? "";
-      String t4 = d['tip4']?.toString() ?? "";
-
-      int m1 = 0;
-      int m2 = 0;
-
-      if ([t1, t2, t3, t4].every((e) => e.isNotEmpty)) {
-        int tip1 = int.parse(t1);
-        int tip2 = int.parse(t2);
-        int tip3 = int.parse(t3);
-        int tip4 = int.parse(t4);
-
-        bool exact1 = tip1 == r1 && tip2 == r2;
-        bool exact2 = tip3 == r3 && tip4 == r4;
-
-        bool outcome1 = _sameOutcome(tip1, tip2, r1, r2);
-        bool outcome2 = _sameOutcome(tip3, tip4, r3, r4);
-
-        m1 = exact1 ? 15 : (outcome1 ? 5 : 0);
-        m2 = exact2 ? 15 : (outcome2 ? 5 : 0);
-      }
-
-      int total = m1 + m2;
-      if (m1 == 15 && m2 == 15) total += 15;
-
-      list.add({
-        'uid': doc.id,
-        'ime': ime,
-        'prezime': prezime,
-        'm1': m1,
-        'm2': m2,
-        'total': total,
+    if (!doc.exists) {
+      setState(() {
+        _roundUsers = [];
+        _myRoundPosition = null;
+        _loading = false;
       });
+      return;
     }
 
-    list.sort((a, b) => b['total'].compareTo(a['total']));
+    final users = List<Map<String, dynamic>>.from(doc.data()!['users']);
+    users.sort((a, b) => b['total'].compareTo(a['total']));
 
     final myUid = FirebaseAuth.instance.currentUser?.uid;
+    int? myPos;
     if (myUid != null) {
-      for (int i = 0; i < list.length; i++) {
-        if (list[i]['uid'] == myUid) {
-          _myRoundPosition = i + 1;
+      for (int i = 0; i < users.length; i++) {
+        if (users[i]['uid'] == myUid) {
+          myPos = i + 1;
           break;
         }
       }
     }
 
     setState(() {
-      _roundUsers = list;
+      _roundUsers = users;
+      _myRoundPosition = myPos;
       _loading = false;
     });
-  }
-
-  bool _sameOutcome(int a, int b, int x, int y) {
-    int sign(int d) => d > 0 ? 1 : (d < 0 ? -1 : 0);
-    return sign(a - b) == sign(x - y);
   }
 
   String _iconForRank(int pos) {
@@ -142,64 +95,144 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF022904),
-
+      backgroundColor: const Color(0xFF00150A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF022904),
+        backgroundColor: const Color(0xFF00150A),
         centerTitle: true,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2ECC71)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'DoublePick',
           style: TextStyle(
-            color: Colors.yellow,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
           ),
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.yellow))
+          ? const Center(
+        child: CircularProgressIndicator(color: Color(0xFFEFFF8A)),
+      )
           : Column(
         children: [
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           const Text(
             "ROUND RANK",
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.yellow,
-            ),
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEFFF8A),
+                shadows: [
+                  Shadow(color: Colors.yellow, blurRadius: 12),
+                ],
+          ),
           ),
           const SizedBox(height: 8),
 
+          // Dropdown za izbor kola
+          if (_totalRounds > 0)
+            Center(
+              child: Container(
+                width: 140, // manja širina
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF22E58B).withOpacity(0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: _selectedRound,
+                    isExpanded: true,
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
+                    style: const TextStyle(
+                      color: Colors.yellow,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    dropdownColor: const Color(0xFF112309),
+                   // plava pozadina kada se otvori
+                    items: List.generate(_totalRounds, (index) {
+                      int rn = index + 1;
+                      return DropdownMenuItem(
+                        value: rn,
+                        child: Center(
+                          child: Text(
+                            "Round $rn",
+                            style: const TextStyle(color: Colors.yellow),
+                          ),
+                        ),
+                      );
+                    }),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedRound = val;
+                        });
+                        _loadRoundStandings(val);
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
+
+
+          const SizedBox(height: 14),
+
           if (_roundUsers.isNotEmpty)
             Text(
-              "Winner: ${_roundUsers.first['ime']} ${_roundUsers.first['prezime']}",
+              "🏆 Winner: ${_roundUsers.first['ime']} ${_roundUsers.first['prezime']}",
               style: const TextStyle(
-                color: Colors.yellowAccent,
+                color: Color(0xFF44FF96),
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           Expanded(
-            child: Card(
-              color: const Color(0xFFFFF59D),
+            child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE9FFB1), Color(0xFFDFFF8E)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.greenAccent.withOpacity(0.35),
+                    blurRadius: 24,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 10),
+                  )
+                ],
+              ),
               child: ListView.builder(
                 itemCount: _roundUsers.length,
+                padding: const EdgeInsets.all(14),
                 itemBuilder: (context, index) {
                   final u = _roundUsers[index];
                   final pos = index + 1;
+                  final bool isMe = _myRoundPosition == pos;
 
                   return InkWell(
+                    borderRadius: BorderRadius.circular(16),
                     onTap: () {
                       Navigator.pushNamed(
                         context,
@@ -208,67 +241,46 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
-                        color: (_myRoundPosition == pos)
-                            ? Colors.green.shade200
-                            : null,
+                        borderRadius: BorderRadius.circular(16),
+                        color: isMe ? Colors.greenAccent.withOpacity(0.35) : Colors.white.withOpacity(0.6),
+                        border: Border.all(
+                          color: isMe ? Colors.green : Colors.transparent,
+                          width: 1.2,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 "$pos. ${u['ime']} ${u['prezime']}",
                                 style: const TextStyle(
                                   fontSize: 18,
-                                  color: Colors.black,     // ✔ crno
-                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Text(
-                                _iconForRank(pos),
-                                style: const TextStyle(fontSize: 24),
-                              ),
+                              Text(_iconForRank(pos), style: const TextStyle(fontSize: 24)),
                             ],
                           ),
-
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                "Match 1: ${u['m1']} pts",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,   // ✔ crno
-                                ),
-                              ),
-                              Text(
-                                "Match 2: ${u['m2']} pts",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,   // ✔ crno
-                                ),
-                              ),
+                              Text("Match 1: ${u['m1']} pts", style: const TextStyle(fontSize: 16, color: Colors.black)),
+                              Text("Match 2: ${u['m2']} pts", style: const TextStyle(fontSize: 16, color: Colors.black)),
                             ],
                           ),
-
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             "Total: ${u['total']} pts",
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,     // ✔ crno
-                            ),
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black),
                           ),
-                          const Divider(height: 18),
                         ],
                       ),
                     ),
@@ -278,24 +290,19 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
             ),
           ),
 
+          const SizedBox(height: 8),
           if (_myRoundPosition != null)
             Text(
               "Your round position: $_myRoundPosition / ${_roundUsers.length}",
               style: const TextStyle(
                 fontSize: 18,
-                color: Colors.white,
+                color: Color(0xFF44FF96),
                 fontWeight: FontWeight.bold,
               ),
             ),
-
-          const SizedBox(height: 10),
-
-
-
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
         ],
       ),
-
       bottomNavigationBar: _bannerAd == null
           ? null
           : Container(

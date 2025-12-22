@@ -18,6 +18,7 @@ import 'screens/favorites_screen.dart';
 import 'screens/AdminLeague.dart';
 import 'screens/LeagueDetail.dart';
 import 'screens/MyLeagues.dart';
+import 'screens/invite_code.dart';
 
 
 
@@ -90,10 +91,18 @@ class MyApp extends StatelessWidget {
         '/adminLeague' : (context) => const AdminLeagueScreen(),
 
 
-        '/profile': (context) {
+
+          '/profile': (context) {
           final uid = ModalRoute.of(context)!.settings.arguments as String;
           return UserProfileScreen(uid: uid);
-        },
+
+    },
+
+             '/invite_code': (context) {
+    return const Scaffold(
+    body: Center(child: Text("Invalid route")),
+             );
+    },
 
 
       },
@@ -122,6 +131,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (user != null) {
       Navigator.pushReplacementNamed(context, '/home');
+      print("Current user: ${FirebaseAuth.instance.currentUser?.email}");
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }

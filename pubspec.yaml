@@ -2,7 +2,7 @@ name: doublepick
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+9
+version: 1.0.0+15
 
 environment:
   sdk: ^3.9.2
@@ -25,6 +25,7 @@ dependencies:
   permission_handler: ^11.0.1
   sign_in_with_apple: ^6.0.0
   screenshot: ^2.1.0
+
 
 
 

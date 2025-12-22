@@ -25,7 +25,7 @@ class _MyLeaguesScreenState extends State<MyLeaguesScreen> {
     _myLeague = null;
     _memberLeagues.clear();
 
-    // 🔹 1. Liga gdje je korisnik admin
+    // 🔹 Liga gdje je korisnik admin
     final myLeagueQuery = await FirebaseFirestore.instance
         .collection('leagues')
         .where('adminUid', isEqualTo: uid)
@@ -38,34 +38,37 @@ class _MyLeaguesScreenState extends State<MyLeaguesScreen> {
       _myLeague!['docId'] = doc.id;
     }
 
-    // 🔹 2. Lige gdje je korisnik član (ali nije admin)
+    // 🔹 Lige gdje je korisnik član (ali nije admin)
     final allDocs = await FirebaseFirestore.instance.collection('leagues').get();
-
     List<Map<String, dynamic>> memberLeagues = [];
 
     for (var doc in allDocs.docs) {
       final data = doc.data();
 
-      // Provjera stare strukture: members: [{ uid: ..., email: ...}]
-      if (data.containsKey('members')) {
+      // preskoči ako je admin
+      if (data['adminUid'] == uid) continue;
+
+      bool added = false;
+
+      // Nova struktura
+      if (data.containsKey('memberUids')) {
+        final List<String> members = List<String>.from(data['memberUids']);
+        if (members.contains(uid)) {
+          data['docId'] = doc.id;
+          memberLeagues.add(data);
+          added = true;
+        }
+      }
+
+      // Stara struktura
+      if (!added && data.containsKey('members')) {
         final List memberObjects = data['members'];
         final bool isMember = memberObjects.any((m) => m['uid'] == uid);
-
-        if (isMember && data['adminUid'] != uid) {
+        if (isMember) {
           data['docId'] = doc.id;
           memberLeagues.add(data);
         }
       }
-
-      // Provjera nove strukture: memberUids: ["uid1", "uid2"]
-      try {
-        final List<String> members = List<String>.from(data['memberUids']);
-
-        if (members.contains(uid) && data['adminUid'] != uid) {
-          data['docId'] = doc.id;
-          memberLeagues.add(data);
-        }
-      } catch (_) {}
     }
 
     setState(() {
@@ -121,122 +124,135 @@ class _MyLeaguesScreenState extends State<MyLeaguesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF022904),
+      backgroundColor: const Color(0xFF00150A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF022904),
+        backgroundColor: const Color(0xFF00150A),
         centerTitle: true,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2ECC71)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'DoublePick',
           style: TextStyle(
-            color: Colors.yellow,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
           ),
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Text(
               "MY LEAGUES",
               style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.yellow,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEFFF8A),
+                shadows: [
+                  Shadow(color: Colors.yellow, blurRadius: 12),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
 
-            // 🔹 Admin liga
+            // Kreiraj ligu ako nema admin lige
             if (_myLeague == null)
               ElevatedButton.icon(
                 onPressed: _createLeague,
                 icon: const Icon(Icons.add),
                 label: const Text("Create League"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
+                  backgroundColor: Colors.greenAccent.shade400,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               )
             else
-              Card(
-                color: Colors.yellow[200],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/leagueDetail',
-                      arguments: _myLeague!['docId'],
-                    );
-                  },
-                  title: Text(
-                    _myLeague!['name'] ?? '',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/adminLeague',
-                        arguments: _myLeague!['docId'],
-                      );
-                    },
-                    child: const Text("Admin League"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ),
+              _leagueCard(_myLeague!, isAdmin: true),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // 🔹 Lige gdje je član
+            // Lige gdje je član
             if (_memberLeagues.isNotEmpty)
               Expanded(
                 child: ListView.builder(
                   itemCount: _memberLeagues.length,
                   itemBuilder: (context, index) {
                     final league = _memberLeagues[index];
-                    return Card(
-                      color: Colors.yellow[200],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ListTile(
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/leagueDetail',
-                            arguments: league['docId'],
-                          );
-                        },
-                        title: Text(
-                          league['name'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    );
+                    return _leagueCard(league);
                   },
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ===== Liga Card Widget =====
+  Widget _leagueCard(Map<String, dynamic> league, {bool isAdmin = false}) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 50 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            colors: isAdmin
+                ? [Colors.green.shade200.withOpacity(0.95), Colors.yellow.shade200.withOpacity(0.85)]
+                : [Colors.green.shade100.withOpacity(0.9), Colors.yellow.shade100.withOpacity(0.8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.greenAccent.withOpacity(0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          onTap: () {
+            Navigator.pushNamed(context, '/leagueDetail', arguments: league['docId']);
+          },
+          title: Text(
+            league['name'] ?? '',
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          trailing: isAdmin
+              ? ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/adminLeague', arguments: league['docId']);
+            },
+            child: const Text("Admin League"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+            ),
+          )
+              : null,
         ),
       ),
     );

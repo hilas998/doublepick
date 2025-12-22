@@ -10,6 +10,10 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 
 
@@ -22,8 +26,8 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin,WidgetsBindingObserver {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const platform = MethodChannel('app.settings.channel');
@@ -46,9 +50,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   BannerAd? _bannerAd;
   RewardedAd? _rewardedAd;
-  bool isRewardReady = false;
-  bool canWatchAd = true;
-  DateTime? nextAvailable;
+
+
+  String inviteCode = '';
+  bool _canWatchAd = false;
+  Timer? _adCooldownTimer;
+  int _nextAdTime = 0;
+  String _adCountdownText = "";
+  Timer? _countdownTimer;
+
+
+  bool _adConsumedThisSession = false;
+
+
+
 
   // 🔔 Lokalna obavijest (za Ad cooldown)
   final FlutterLocalNotificationsPlugin _localNoti =
@@ -60,6 +75,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _roundHandledForThisCycle = false;
   bool _tipsClearedForThisRound = false;
+  late AnimationController _animController;
+  late AnimationController _pulseController;
+
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _pulseAnim;
 
 
 
@@ -68,116 +89,92 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _connSub = Connectivity().onConnectivityChanged.listen((results) {
+      final hasInternet = results.any(
+            (r) => r == ConnectivityResult.mobile || r == ConnectivityResult.wifi,
+      );
+
+      if (!hasInternet && mounted) {
+        _showNoInternetDialog();
+      }
+    });
+
+    WidgetsBinding.instance.addObserver(this);
+    MobileAds.instance.initialize();
+
     requestNotificationPermission();
+    tz.initializeTimeZones();
     _initializeLocalNotifications();
+
+
+
     _loadUser();
     _loadMatchAndTimer();
     _initAds();
-    _checkCooldown();
-    _initConnectivityWatch();
-    _checkReferralLink();
 
-    Timer.periodic(const Duration(minutes: 3), (_) {
-      if (mounted && canWatchAd && !isRewardReady) {
-        _loadRewarded();
-      }
-    });
+   // _adCooldownTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+     // _checkAdAvailability();
+   // });
+
+
+    _loadBanner();
+    _loadRewarded();
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _pulseAnim = Tween<double>(begin: 1, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _animController.forward();
 
   }
 
   @override
   void dispose() {
+
     _connSub.cancel();
     _bannerAd?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
+    _adCooldownTimer?.cancel();
+    _countdownTimer?.cancel();
+
+
+
     for (var c in [tip1Ctrl, tip2Ctrl, tip3Ctrl, tip4Ctrl]) {
       c.dispose();
     }
+
+
+    _animController.dispose();
+    _pulseController.dispose();
+
     super.dispose();
+
   }
-
-
-
-  void requestNotificationPermission() async {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-
-    NotificationSettings settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    print('Dozvola: ${settings.authorizationStatus}');
-    if (settings.authorizationStatus == AuthorizationStatus.denied ||
-        settings.authorizationStatus == AuthorizationStatus.provisional) {
-      _showNotificationSettingsDialog();
-    }
-  }
-  Future<void> _showNotificationSettingsDialog() async {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Enable notifications"),
-        content: const Text(
-          "Notifications are required for updates, reminders and rewards.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await platform.invokeMethod('openNotificationSettings');
-            },
-            child: const Text("Open settings"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Later"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _initializeLocalNotifications() async {
-    const AndroidInitializationSettings android =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings ios = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const InitializationSettings settings = InitializationSettings(
-      android: android,
-      iOS: ios,
-    );
-
-    await _localNoti.initialize(settings);
-  }
-
-
-  Future<void> _showAdAvailableNotification() async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'ad_channel',               // kanal ID
-      'Ad Notifications',         // ime kanala
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-
-    const NotificationDetails notifDetails =
-    NotificationDetails(android: androidDetails);
-
-    await _localNoti.show(
-      0,
-      'Ad is available again!',           // 🔔 NASLOV
-      'Watch the ad and earn +2 points.', // 📌 TEKST
-      notifDetails,
-    );
-  }
-
 
 
 
@@ -195,12 +192,40 @@ class _HomeScreenState extends State<HomeScreen> {
         surname = doc['prezime'] ?? '';
         email = u.email ?? '';
         score = doc['score'] ?? '0';
-        hasSubmitted = doc.data()!.containsKey('tip1');
+
+        hasSubmitted = doc.data()?['tip1'] != null &&
+            doc.data()?['tip2'] != null &&
+            doc.data()?['tip3'] != null &&
+            doc.data()?['tip4'] != null;
+
+
+
         tip1Ctrl.text = doc.data()?['tip1']?.toString() ?? '';
         tip2Ctrl.text = doc.data()?['tip2']?.toString() ?? '';
         tip3Ctrl.text = doc.data()?['tip3']?.toString() ?? '';
         tip4Ctrl.text = doc.data()?['tip4']?.toString() ?? '';
+
+
+
+
+
+
+        final now = DateTime.now().millisecondsSinceEpoch;
+        _nextAdTime = doc.data()?['nextAdTime'] ?? 0;
+        _canWatchAd = now >= _nextAdTime;
+
+        if (!_canWatchAd && _nextAdTime > 0) {
+          _startCountdown();
+        }
+
+
+        if (!_canWatchAd && _nextAdTime > 0) {
+          _startCountdown();
+        }
+
       });
+
+      inviteCode = doc['inviteCode'] ?? _auth.currentUser!.uid.substring(0, 6);
     }
   }
 
@@ -287,16 +312,11 @@ class _HomeScreenState extends State<HomeScreen> {
       targetTime = scoreCalcEndTime;
 
 
-      // 🔥 Ovdje brišemo tipove čim prođe scoreCalcEndTime
-      if (now >= scoreCalcEndTime && !_tipsClearedForThisRound) {
-        _tipsClearedForThisRound = true;
-        await _clearUserTips();
-      }
 
       // ✅ kopiranje kad završi Results coming in
       if (!_roundHandledForThisCycle && now >= scoreCalcEndTime - 1000) {
         _roundHandledForThisCycle = true;
-        await _startNewRound();
+
       }
     } else {
       newPhase = "Round over";
@@ -310,6 +330,161 @@ class _HomeScreenState extends State<HomeScreen> {
       remaining = diff;
     });
   }
+
+
+
+
+  Future<void> _checkAdAvailability() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (!doc.exists) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final nextAdTime = doc.data()?['nextAdTime'] ?? 0;
+
+    final canWatch = now >= nextAdTime;
+
+    if (canWatch && !_canWatchAd) {
+      setState(() {
+        _canWatchAd = true;
+      });
+
+      // osiguraj da je reklama učitana
+      if (_rewardedAd == null) {
+        _loadRewarded();
+      }
+    }
+  }
+
+  void _loadRewarded() {
+    RewardedAd.load(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/2944332927'
+          : 'ca-app-pub-6791458589312613/7308197301',
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          setState(() {});
+        },
+        onAdFailedToLoad: (error) {
+          _rewardedAd = null;
+        },
+      ),
+    );
+  }
+
+  void _showRewarded() {
+    if (_rewardedAd == null) return;
+    if (_adConsumedThisSession) return;
+
+    _adConsumedThisSession = true;
+
+    setState(() {
+      _canWatchAd = false;
+      _adCountdownText = "";
+    });
+
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAd = null;
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAd = null;
+      },
+    );
+
+    _rewardedAd!.show(
+      onUserEarnedReward: (_, __) async {
+        await _addPoints(2);
+        await _startAdCooldown(); // 🔥 Firebase zapis
+      },
+    );
+  }
+
+
+  void _loadBanner() {
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) => ad.dispose(),
+      ),
+    )..load();
+  }
+  void requestNotificationPermission() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    print('Dozvola: ${settings.authorizationStatus}');
+    if (settings.authorizationStatus == AuthorizationStatus.denied ||
+        settings.authorizationStatus == AuthorizationStatus.provisional) {
+      _showNotificationSettingsDialog();
+    }
+  }
+  Future<void> _showNotificationSettingsDialog() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Enable notifications"),
+        content: const Text(
+          "Notifications are required for updates, reminders and rewards.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await platform.invokeMethod('openNotificationSettings');
+            },
+            child: const Text("Open settings"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Later"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _initializeLocalNotifications() async {
+    const AndroidInitializationSettings android =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings ios = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings settings = InitializationSettings(
+      android: android,
+      iOS: ios,
+    );
+
+    await _localNoti.initialize(settings);
+
+
+
+  }
+
+
+
+
+
+
+
+
 
   // 🔹 Slanje tipova
   Future<void> _submitTips() async {
@@ -342,64 +517,11 @@ class _HomeScreenState extends State<HomeScreen> {
         .showSnackBar(const SnackBar(content: Text('Predictions submitted!')));
   }
 
-  // 🔹 Provjera i bodovanje
-  String get _roundId =>
-      "${startTime.toString()}-${globalEndTime.toString()}-${scoreCalcEndTime.toString()}";
-
-  bool _isAllResultsFilled() =>
-      rez1.isNotEmpty && rez2.isNotEmpty && rez3.isNotEmpty && rez4.isNotEmpty;
 
 
 
-  bool _isExact(int a, int b, int x, int y) => (a == x && b == y);
-  bool _sameOutcome(int a, int b, int x, int y) {
-    int sign(int d) => d > 0 ? 1 : (d < 0 ? -1 : 0);
-    return sign(a - b) == sign(x - y);
-  }
-
-  // 🔹 Kopiranje nove runde
-  Future<void> _startNewRound() async {
-    final nextDoc = await _firestore.collection('timovi').doc('sljedece').get();
-    if (!nextDoc.exists) return;
-    final data = nextDoc.data();
-    if (data == null || data.isEmpty) return;
-
-    await _firestore.collection('timovi').doc('aktivni').set(data);
-
-    final users = await _firestore.collection('users').get();
-    for (var doc in users.docs) {
-      await doc.reference.update({
-        'tip1': FieldValue.delete(),
-        'tip2': FieldValue.delete(),
-        'tip3': FieldValue.delete(),
-        'tip4': FieldValue.delete(),
-      });
-    }
-  }
 
 
-  Future<void> _clearUserTips() async {
-    final users = await _firestore.collection('users').get();
-
-    for (var doc in users.docs) {
-      await doc.reference.update({
-        'tip1': FieldValue.delete(),
-        'tip2': FieldValue.delete(),
-        'tip3': FieldValue.delete(),
-        'tip4': FieldValue.delete(),
-        'roundScore': FieldValue.delete(),
-      });
-    }
-
-    // reset local state for UI
-    setState(() {
-      hasSubmitted = false;
-      tip1Ctrl.clear();
-      tip2Ctrl.clear();
-      tip3Ctrl.clear();
-      tip4Ctrl.clear();
-    });
-  }
 
 
   // === Reklame, internet, referral ===
@@ -419,37 +541,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     )..load();
 
-    _loadRewarded();
+
   }
 
 
-
-  void _loadRewarded() {
-    RewardedAd.load(
-      adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-6791458589312613/2944332927' // 🟢 Android rewarded ID
-          : 'ca-app-pub-6791458589312613/7308197301', // 🟣 iOS rewarded ID
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          setState(() {
-            _rewardedAd = ad;
-            isRewardReady = true;
-          });
-        },
-        onAdFailedToLoad: (_) => setState(() => isRewardReady = false),
-      ),
-    );
-  }
-
-  void _showRewarded() {
-    if (_rewardedAd == null) return;
-    _rewardedAd!.show(onUserEarnedReward: (_, __) {
-      _addPoints(2);
-      _startCooldown();
-    });
-    setState(() => _rewardedAd = null);
-  }
 
   Future<void> _addPoints(int pts) async {
     final uid = _auth.currentUser?.uid;
@@ -463,49 +558,44 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => score = newScore.toString());
   }
 
-  Future<void> _startCooldown() async {
-    final prefs = await SharedPreferences.getInstance();
-    final next = DateTime.now().add(const Duration(hours: 24));
-    await prefs.setString('nextAdTime', next.toIso8601String());
-    setState(() {
-      canWatchAd = false;
-      nextAvailable = next;
-    });
-    Future.delayed(next.difference(DateTime.now()), () {
-      setState(() => canWatchAd = true);
-      _loadRewarded();
+  Future<void> _startAdCooldown() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
 
-      // 🔥 OVDJE DOLAZI NOTIFIKACIJA!
-      _showAdAvailableNotification();
+    final now = DateTime.now();
+    final next = now.add(const Duration(hours: 8));
+
+    await _firestore.collection('users').doc(uid).update({
+      'nextAdTime': next.millisecondsSinceEpoch,
     });
+
+    await _scheduleAdAvailableNotification(next);
+    print("🔥 Ad cooldown started. Next ad at: ${next.millisecondsSinceEpoch}");
   }
 
-  Future<void> _checkCooldown() async {
-    final prefs = await SharedPreferences.getInstance();
-    final str = prefs.getString('nextAdTime');
-    if (str == null) {
-      setState(() => canWatchAd = true);
-      return;
-    }
-    final next = DateTime.tryParse(str);
-    if (next == null || DateTime.now().isAfter(next)) {
-      setState(() => canWatchAd = true);
-    } else {
-      setState(() {
-        canWatchAd = false;
-        nextAvailable = next;
-      });
-    }
+  Future<void> _scheduleAdAvailableNotification(DateTime time) async {
+    const androidDetails = AndroidNotificationDetails(
+      'ad_channel',
+      'Ad Notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const details = NotificationDetails(android: androidDetails);
+
+    await _localNoti.zonedSchedule(
+      999, // ID
+      'Ad is available again!',
+      'Watch the ad and earn +2 points.',
+      tz.TZDateTime.from(time, tz.local),
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+      UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: null,
+    );
   }
 
-  void _initConnectivityWatch() {
-    _connSub = Connectivity().onConnectivityChanged.listen((resList) async {
-      final res = resList.isNotEmpty ? resList.first : ConnectivityResult.none;
-      if (res == ConnectivityResult.none) {
-        _showNoInternetDialog();
-      }
-    });
-  }
 
   void _showNoInternetDialog() {
     showDialog(
@@ -520,24 +610,49 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  void _startCountdown() {
+    _countdownTimer?.cancel();
 
-  void _checkReferralLink() async {
-    final uri = Uri.base;
-    final ref = uri.queryParameters['ref'];
-    if (ref != null && ref.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('referral_uid', ref);
-    }
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final diff = _nextAdTime - now;
+
+      if (diff <= 0) {
+        _countdownTimer?.cancel();
+        setState(() {
+          _canWatchAd = true;
+          _adCountdownText = "";
+        });
+
+        if (_rewardedAd == null) {
+          _loadRewarded();
+        }
+
+
+        return;
+      }
+
+      final duration = Duration(milliseconds: diff);
+      final h = duration.inHours.toString().padLeft(2, '0');
+      final m = (duration.inMinutes % 60).toString().padLeft(2, '0');
+      final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
+
+      setState(() {
+        _adCountdownText = "Next ad reward in $h:$m:$s";
+      });
+    });
   }
+
+
 
   void _shareReferral() async {
     final u = _auth.currentUser;
     if (u == null) return;
-    final link = "https://doublepick.web.app/invite.html?ref=${u.uid}";
+    final link = "https://play.google.com/store/apps/details?id=com.doublepick&referrer=${u.uid}}";
     await Share.share("🎯 Join DoublePick and earn points!\n$link");
   }
 
-  // === UI ===
+
   @override
   Widget build(BuildContext context) {
     final h = remaining.inHours;
@@ -545,14 +660,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final s = remaining.inSeconds.remainder(60);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF022904),
+      backgroundColor: const Color(0xFF00150A),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF00150A),
+        centerTitle: true,
+        elevation: 0,
+        automaticallyImplyLeading: false,
         title: const Text(
           'DoublePick',
-          style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
+          ),
         ),
-        backgroundColor: const Color(0xFF022904),
-        centerTitle: true,
         actions: [
           IconButton(
             onPressed: _logout,
@@ -560,285 +682,609 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _headerCard(context),
-            const SizedBox(height: 16),
-            Text(phaseText,
-                style: const TextStyle(color: Colors.white, fontSize: 22)),
-            Text(
-              "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}",
-              style: const TextStyle(
-                  color: Colors.yellow,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold),
+
+      body: Column(
+        children: [
+
+          // ===== SCROLLABLE CONTENT =====
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // HEADER
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    tween: Tween(begin: 0, end: 1),
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 24 * (1 - value)),
+                        child: child,
+                      ),
+                    ),
+                    child: _headerCard(context),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // PHASE + TIMER CARD
+                  Card(
+                    elevation: 4,
+                    shadowColor: const Color(0xFF44FF96).withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF022D12),
+                            Color(0xFF011F0A),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            phaseText.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 1,
+                              color: Color(0xFF44FF96),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "${h.toString().padLeft(2, '0')}:"
+                                "${m.toString().padLeft(2, '0')}:"
+                                "${s.toString().padLeft(2, '0')}",
+                            style: const TextStyle(
+                              color: Color(0xFFEFFF8A),
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ===== MATCH CARDS WITH INPUTS =====
+                  _matchCard(team1, team2, rez1, rez2, tip1Ctrl, tip2Ctrl),
+                  const SizedBox(height: 8),
+                  _matchCard(team3, team4, rez3, rez4, tip3Ctrl, tip4Ctrl),
+
+                  const SizedBox(height: 16),
+
+                  // SEND RESULTS BUTTON
+                  if (!hasSubmitted && phaseText == "Enrollment time left")
+                    Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF44FF96),
+                              Color(0xFFEFFF8A),
+                            ],
+                          ),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _submitTips,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 40, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send_rounded, color: Colors.black),
+                              SizedBox(width: 10),
+                              Text(
+                                "SEND RESULTS",
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 12),
+
+                  // REWARDED AD BUTTON
+                  if (_canWatchAd && _rewardedAd != null)
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _showRewarded,
+                        icon: const Icon(Icons.play_circle_fill),
+                        label: const Text("Watch ad for +2 points"),
+                      ),
+                    )
+                  else if (!_canWatchAd && _adCountdownText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        _adCountdownText,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _matchCard(team1, team2, rez1, rez2, tip1Ctrl, tip2Ctrl),
-            const SizedBox(height: 8),
-            _matchCard(team3, team4, rez3, rez4, tip3Ctrl, tip4Ctrl),
-            const SizedBox(height: 16),
-            if (!hasSubmitted && phaseText == "Enrollment time left")
-              ElevatedButton(
-                onPressed: _submitTips,
-                child: const Text("Send Results"),
-              ),
-            const SizedBox(height: 12),
-            if (canWatchAd)
-              ElevatedButton.icon(
-                onPressed: isRewardReady ? _showRewarded : null,
-                icon: const Icon(Icons.play_circle_fill),
-                label: const Text("Watch ad for +2 points"),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.yellowAccent.shade700),
-              )
-            else
-              Text(
-                "Next ad available at:\n${nextAvailable?.toLocal().toString().split('.')[0] ?? ''}",
-                style: const TextStyle(color: Colors.white70),
-              ),
-          ],
+          ),
+
+          // ===== FOOTER =====
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: const Color(0xFF011F0A),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    "Invite code: $inviteCode",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: Color(0xFF44FF96),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(
+                          ClipboardData(text: inviteCode),
+                        );
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(
+                          const SnackBar(
+                            content: Text("Invite code copied!"),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text(
+                        "Copy",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Share.share(
+                          "Join DoublePick! Your invite code is: $inviteCode",
+                        );
+                      },
+                      icon: const Icon(Icons.share),
+                      label: const Text(
+                        "Share",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+
+      // ===== BANNER AD =====
+      bottomNavigationBar: _bannerAd == null
+          ? null
+          : SafeArea(
+        child: SizedBox(
+          width: _bannerAd!.size.width.toDouble(),
+          height: _bannerAd!.size.height.toDouble(),
+          child: AdWidget(ad: _bannerAd!),
         ),
       ),
-      bottomNavigationBar:  null
-
     );
   }
 
-
-
-  Widget _headerCard(BuildContext context) => Card(
-    color: const Color(0xFFFFF59D),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
+  Widget _headerCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFF5E179), // svjetlija pozadina
+        boxShadow: [
+          BoxShadow(
+            color: Colors.greenAccent.withOpacity(0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          // Ime + share dugme
+          // ===== USER ROW =====
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person, color: Colors.black, size: 20),
-                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.green, width: 2),
+                      color: Colors.black, // unutrašnjost kruga crna
+                    ),
+                    child: const Icon(Icons.person, size: 20, color: Colors.green), // ikona u zelenoj boji
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     "$name $surname",
                     style: const TextStyle(
                       fontSize: 17,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00150A),
                     ),
                   ),
                 ],
               ),
-
-              IconButton(
+              ElevatedButton(
                 onPressed: _shareReferral,
-                icon: const Icon(Icons.share, color: Colors.black),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22E58B),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Icon(Icons.share, color: Colors.black, size: 20),
               ),
             ],
           ),
 
-          const SizedBox(height: 2),   // ⬅️ email vrlo blizu imenu
+          const SizedBox(height: 12),
 
-          // Email
+          // ===== EMAIL =====
           Row(
             children: [
-              const Icon(Icons.email, color: Colors.black, size: 20),
+              const Icon(Icons.email_outlined, size: 14, color: Colors.black54),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   email,
-                  style: const TextStyle(fontSize: 15, color: Colors.black),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF00150A),
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
 
-          const SizedBox(height: 10),   // ⬅️ veći razmak email → score
-
-          // Score
-          Row(
-            children: [
-              const Icon(Icons.star, color: Colors.deepPurple, size: 22),
-              const SizedBox(width: 6),
-              Text(
-                "My score: $score",
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.deepPurple,
-                ),
+          // ===== SCORE =====
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF44FF96), Color(0x6764E8FC)], // zel.-žuti gradijent
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star, color: Colors.black, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  "Score: $score",
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1, color: Colors.black54),
-          ),
+          const SizedBox(height: 12),
+          const Divider(color: Colors.black, height: 1), // horizontalna linija
 
-          // Standings / Rules / Reset
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => Navigator.pushNamed(context, '/standings'),
-                child: const Text(
-                  "Standings Global",
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 3),
-
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => Navigator.pushNamed(context, '/roundStandings'),
-                child: const Text(
-                  "Standings Round ",
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => Navigator.pushNamed(context, '/rules'),
-                child: const Text(
-                  "Rules of the game",
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 3),
-
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => Navigator.pushNamed(context, '/reset'),
-                child: const Text(
-                  "Reset password",
-                  style: TextStyle(
-                    color: Colors.deepOrange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              if (email == "salihlihic998@gmail.com")
-                TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/admin'),
-                  child: const Text(
-                    "Admin panel",
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-                ),
-
-
-
-
-            ],
-          ),
-
+          const SizedBox(height: 6),
+          // ===== MENU LINKS =====
+          _menuTile(context, "Standings Global", Icons.public, '/standings', textColor: Colors.black),
+          _menuTile(context, "Standings Round", Icons.emoji_events, '/roundStandings', textColor: Colors.black),
+          _menuTile(context, "Rules of the game", Icons.rule, '/rules', textColor: Colors.black),
+          _menuTile(context, "Reset password", Icons.lock_reset, '/reset', danger: true, textColor: Colors.red),
+          if (email == "salihlihic998@gmail.com")
+            _menuTile(
+              context,
+              "Admin panel",
+              Icons.admin_panel_settings,
+              '/admin',
+              danger: true,
+              textColor: Colors.red,
+            ),
         ],
       ),
-    ),
-  );
+    );
+  }
 
-
-  // 🔹 Match card prikaz
-  Widget _matchCard(String t1, String t2, String r1, String r2,
-      TextEditingController c1, TextEditingController c2) {
-    return Card(
-      color: Colors.green.shade400,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(t1,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            Text("$r1 : $r2",
-                style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black)),
-            Text(t2,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-          ]),
-          const SizedBox(height: 8),
-          if (phaseText == "Enrollment time left" && !hasSubmitted)
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: c1,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(1), // ograniči na 1 cifru
-                    FilteringTextInputFormatter.digitsOnly, // samo brojevi
-                  ],
-                  decoration: const InputDecoration(labelText: "Home"),
-                ),
+// ===== MODIFIKOVANI MENU TILE =====
+  Widget _menuTile(
+      BuildContext context,
+      String title,
+      IconData icon,
+      String route, {
+        bool danger = false,
+        Color textColor = Colors.black,
+      }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.pushNamed(context, route),
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: danger
+              ? Colors.red.withOpacity(0.15)
+              : Colors.lightBlue.withOpacity(0.2), // svjetlo plava pozadina
+          border: Border.all(
+            color: danger ? Colors.redAccent : Colors.blueAccent.withOpacity(0.35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: danger ? Colors.redAccent : Colors.blueAccent,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: danger ? Colors.redAccent : textColor,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: c2,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(1), // ograniči na 1 cifru
-                    FilteringTextInputFormatter.digitsOnly, // samo brojevi
-                  ],
-                  decoration: const InputDecoration(labelText: "Away"),
-                ),
-              ),
-            ])
-          else if (hasSubmitted &&
-              (phaseText == "Enrollment time left" ||
-                  phaseText == "Results coming in"))
-            Text("Your pick: ${c1.text}:${c2.text}",
-                style: const TextStyle(fontSize: 16, color: Colors.black87)),
-        ]),
+            ),
+          ],
+        ),
       ),
     );
   }
 
 
-  void _logout() async {
-    await FirebaseAuth.instance.signOut();
-    if (mounted) Navigator.pushReplacementNamed(context, '/login');
+
+
+  Widget _matchCard(
+      String homeTeam,
+      String awayTeam,
+      String homeResult,
+      String awayResult,
+      TextEditingController homeCtrl,
+      TextEditingController awayCtrl,
+      ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFB8FF5C), Color(0xFFB8FF5C)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.greenAccent.withOpacity(0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.white.withOpacity(0.85),
+        ),
+        child: Column(
+          children: [
+            // ===== TEAM NAMES + RESULT =====
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    homeTeam, // 🔥 TAČNO KAKO JE U FIREBASE
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                Text(
+                  "$homeResult : $awayResult", // ❌ NEMA KAPSULE
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    awayTeam, // 🔥 TAČNO KAKO JE U FIREBASE
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ===== INPUT SCORE =====
+            if (!hasSubmitted && phaseText == "Enrollment time left")
+              Row(
+                children: [
+                  _scoreInput(homeCtrl),
+                  const SizedBox(width: 14),
+                  _scoreInput(awayCtrl),
+                ],
+              )
+
+    else
+    Container(
+    width: 140, // malo manja širina da ne zauzima cijeli red
+    height: 50,
+    decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(18),
+    gradient: const LinearGradient(
+    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+    ),
+    boxShadow: [
+    BoxShadow(
+    color: const Color(0xFF22E58B).withOpacity(0.45),
+    blurRadius: 16,
+    spreadRadius: 1,
+    offset: const Offset(0, 6),
+    ),
+    ],
+    ),
+    child: Container(
+    margin: const EdgeInsets.all(2.2),
+    decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(16),
+    color: Colors.white.withOpacity(0.85),
+    ),
+    child: Center(
+    child: Text(
+    "Your pick: " +
+    ((homeCtrl.text.isEmpty && awayCtrl.text.isEmpty)
+    ? "No results"
+        : "${homeCtrl.text}-${awayCtrl.text}"),
+    style: const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w900,
+    color: Color(0xFF00150A),
+    ),
+    textAlign: TextAlign.center,
+    ),
+    ),
+    ),
+    ),
+
+
+
+          ],
+        ),
+      ),
+    );
   }
+
+
+
+  Widget _scoreInput(TextEditingController ctrl) {
+    return Expanded(
+      child: Container(
+        height: 58,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF22E58B).withOpacity(0.45),
+              blurRadius: 16,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(2.2), // okvir efekat
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+          ),
+          child: TextField(
+            controller: ctrl,
+            maxLength: 1, // ✅ SAMO JEDNA CIFRA
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF00150A),
+            ),
+            decoration: const InputDecoration(
+              counterText: "",
+              hintText: "enter score",
+              hintStyle: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF22E58B),
+                letterSpacing: 1,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  void _logout() async {
+  await FirebaseAuth.instance.signOut();
+  if (mounted) Navigator.pushReplacementNamed(context, '/login');
+  }
+
+
+
+
 }
+
