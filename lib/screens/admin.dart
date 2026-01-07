@@ -72,12 +72,12 @@ class AdminScreen extends StatelessWidget {
         bool outcome1 = _sameOutcome(tip1, tip2, r1, r2);
         bool outcome2 = _sameOutcome(tip3, tip4, r3, r4);
 
-        m1 = exact1 ? 15 : (outcome1 ? 5 : 0);
-        m2 = exact2 ? 15 : (outcome2 ? 5 : 0);
+        m1 = exact1 ? 20 : (outcome1 ? 7 : 0);
+        m2 = exact2 ? 20 : (outcome2 ? 7 : 0);
       }
 
       int total = m1 + m2;
-      if (m1 == 15 && m2 == 15) total += 15;
+      if (m1 == 20 && m2 == 20) total += 20;
 
       // 🔹 Update global score
       int global = int.tryParse(d['score'] ?? '0') ?? 0;
@@ -175,8 +175,6 @@ class AdminScreen extends StatelessWidget {
 
 
 
-
-
   Future<void> _resetSeason(BuildContext context) async {
     final db = FirebaseFirestore.instance;
 
@@ -259,6 +257,10 @@ class AdminScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 18),
               ),
             ),
+
+
+
+
 
             // ⬇️ gura RESET SEASON na dno
             const Spacer(),

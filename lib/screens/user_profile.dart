@@ -13,12 +13,88 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
   int? selectedRound;
   List<Map<String, dynamic>> roundsList = [];
+  String? selectedLeagueKey;
+  String? selectedLeagueRound;
+
+  List<String> userLeagues = [];
+  List<String> leagueRounds = [];
+  Map<String, dynamic>? leagueRoundData;
+
 
   @override
   void initState() {
     super.initState();
     _loadRounds();
   }
+  Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
+    final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
+    setState(() {
+      userLeagues = leaguesMap.keys.toList();
+      if (userLeagues.isNotEmpty) {
+        selectedLeagueKey = userLeagues.first;
+      }
+    });
+
+    if (selectedLeagueKey != null) {
+      await _loadLeagueRounds(selectedLeagueKey!);
+    }
+  }
+
+  Future<void> _loadLeagueRounds(String leagueKey) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .collection('${leagueKey}tip1')
+        .get();
+
+    setState(() {
+      leagueRounds = snap.docs.map((d) => d.id).toList();
+      if (leagueRounds.isNotEmpty) {
+        selectedLeagueRound = leagueRounds.first;
+      }
+    });
+
+    if (selectedLeagueRound != null) {
+      await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
+    }
+  }
+
+
+
+
+  Future<void> _loadLeagueRoundData(String leagueKey, String roundId) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.uid)
+        .collection('${leagueKey}tip1')
+        .doc(roundId)
+        .get();
+
+    final raw = Map<String, dynamic>.from(doc.data() ?? {});
+
+    // ⛔ filtriraj prazne / neodigrane mečeve
+    final filtered = <String, dynamic>{};
+
+    raw.forEach((key, value) {
+      final m = Map<String, dynamic>.from(value);
+
+      if (
+      m['home'] != -1 &&
+          m['away'] != -1 &&
+          m['homeTeam'] != null &&
+          m['awayTeam'] != null &&
+          m['homeTeam'].toString().isNotEmpty &&
+          m['awayTeam'].toString().isNotEmpty
+      ) {
+        filtered[key] = m;
+      }
+    });
+
+    setState(() {
+      leagueRoundData = filtered;
+    });
+  }
+
 
   Future<void> _loadRounds() async {
     final db = FirebaseFirestore.instance;
@@ -90,10 +166,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     child: Column(
                       children: [
                         _profileCard(u),
-                        const SizedBox(height: 20),
+
+                        const SizedBox(height: 24),
+
+                        // STARA HISTORIJA (2 MEČA – daily rounds)
                         _roundHistory(),
+
+
+                        const SizedBox(height: 32),
+
+                        // NOVA HISTORIJA (LIGE → RUNDE → MEČEVI)
+                        _leagueHistory(u),
                       ],
                     ),
+
                   ),
                 ),
               ],
@@ -103,7 +189,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ),
     );
   }
-
 
 
   Widget _profileCard(dynamic u) {
@@ -274,6 +359,87 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  Widget _leagueHistory(Map<String, dynamic> userData) {
+    if (userLeagues.isEmpty) {
+      _loadUserLeagues(userData);
+      return const SizedBox();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "League History",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF44FF96),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        /// LEAGUE DROPDOWN
+        DropdownButton<String>(
+          value: selectedLeagueKey,
+          dropdownColor: const Color(0xFF112309),
+          alignment: Alignment.centerLeft,
+          onChanged: (val) async {
+            setState(() {
+              selectedLeagueKey = val;
+              leagueRounds.clear();
+              leagueRoundData = null;
+            });
+            await _loadLeagueRounds(val!);
+          },
+          items: userLeagues.map((l) {
+            return DropdownMenuItem(
+              value: l,
+              child: Text(l.toUpperCase(), style: const TextStyle(color: Colors.yellow)),
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 10),
+
+        /// ROUND DROPDOWN
+        if (leagueRounds.isNotEmpty)
+          DropdownButton<String>(
+            value: selectedLeagueRound,
+            dropdownColor: const Color(0xFF112309),
+            alignment: Alignment.centerLeft, // lijevo poravnanje
+            onChanged: (val) async {
+              if (val == null) return;
+              setState(() => selectedLeagueRound = val);
+              if (selectedLeagueKey != null) {
+                await _loadLeagueRoundData(selectedLeagueKey!, val);
+              }
+            },
+            items: leagueRounds.map((r) {
+              final roundNumber = r.replaceAll(RegExp(r'[^0-9]'), ''); // izvadi broj iz stringa
+              return DropdownMenuItem<String>(
+                value: r,
+                child: Text("Round $roundNumber", style: const TextStyle(color: Colors.yellow)),
+              );
+            }).toList(),
+          ),
+
+
+        const SizedBox(height: 12),
+
+        if (leagueRoundData != null)
+          ...leagueRoundData!.entries.map((e) {
+            final m = Map<String, dynamic>.from(e.value);
+            return Card(
+              child: ListTile(
+                title: Text("${m['homeTeam']} vs ${m['awayTeam']}"),
+                subtitle: Text("Your tip: ${m['home']} : ${m['away']}"),
+                trailing: Text("Result: ${m['resHome']} : ${m['resAway']}"),
+              ),
+            );
+          }).toList(),
+      ],
+    );
+  }
 
   Widget _roundHistory() {
     if (roundsList.isEmpty) return const Text("No rounds played yet", style: TextStyle(color: Colors.white));

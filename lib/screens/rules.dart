@@ -114,14 +114,31 @@ class _RulesScreenState extends State<RulesScreen> {
                       SizedBox(height: 18),
 
                       Text(
-                        "1️⃣ Predict the correct score for both matches.\n\n"
-                            "2️⃣ Correct result (e.g. 2:1 exact) gives 15 points.\n\n"
-                            "3️⃣ Correct outcome (win/draw/loss) gives 5 points.\n\n"
-                            "4️⃣ If both matches have correct scores, you get +15 bonus points.\n\n"
-                            "5️⃣ Each day you can watch one ad to get +2 bonus points.\n\n"
-                            "6️⃣ The leaderboard updates automatically after results are posted.\n\n"
-                            "7️⃣ Each player can create only one league.\n\n"
-                            "8️⃣ The app is intended for fun and entertainment only.",
+
+                      "1️⃣ Predict the correct score for both matches.\n\n"
+
+                      "2️⃣ Special bonus matches:\n\n"
+
+                      "   Correct exact score → 20 points\n\n"
+                      "   Correct outcome (win/draw/loss) → 7 points\n\n"
+
+                  "3️⃣ Other leagues:\n\n"
+
+                  "   Correct exact score → 10 points\n\n"
+
+                  "   Correct outcome (win/draw/loss) → 2 points\n\n"
+
+                "4️⃣ Bonus for both matches correct in special bonus round: +15 points\n\n"
+
+                "5️⃣ Each day you can watch one ad to get 10 bonus points.\n\n"
+
+                "6️⃣ Each league has its own leaderboard, but all points count towards the global score.\n\n"
+
+                "7️⃣ The leaderboard updates automatically after results are posted.\n\n"
+
+                "8️⃣ Each player can create only one league.\n\n"
+
+                  "9️⃣ The app is intended for fun and entertainment only.\n\n",
                         style: TextStyle(
                           fontSize: 18,
                           height: 1.6,

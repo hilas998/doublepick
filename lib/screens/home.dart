@@ -13,6 +13,8 @@ import 'package:flutter/services.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:doublepick/screens/LeagueScreenGlobal.dart';
+
 
 
 
@@ -60,6 +62,8 @@ class _HomeScreenState extends State<HomeScreen>
   Timer? _countdownTimer;
 
 
+
+
   bool _adConsumedThisSession = false;
 
 
@@ -84,6 +88,18 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
+  final List<Map<String, String>> leagues = const [
+    {'id': 'english_league', 'name': 'English League'},
+    {'id': 'german_league', 'name': 'German League'},
+    {'id': 'french_league', 'name': 'French League'},
+    {'id': 'italian_league', 'name': 'Italian League'},
+    {'id': 'spanish_league', 'name': 'Spanish League'},
+    {'id': 'champions_league', 'name': 'Champions League'},
+    {'id': 'confederation_cup', 'name': 'Confederation Cup'},
+    {'id': 'europe_league', 'name': 'Europe League'},
+    {'id': 'world_cup', 'name': 'World Cup'},
+    {'id': 'european_cup', 'name': 'European Cup'},
+  ];
 
 
   @override
@@ -110,11 +126,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     _loadUser();
     _loadMatchAndTimer();
-    _initAds();
 
-   // _adCooldownTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-     // _checkAdAvailability();
-   // });
 
 
     _loadBanner();
@@ -192,6 +204,8 @@ class _HomeScreenState extends State<HomeScreen>
         surname = doc['prezime'] ?? '';
         email = u.email ?? '';
         score = doc['score'] ?? '0';
+        _adConsumedThisSession = false;
+
 
         hasSubmitted = doc.data()?['tip1'] != null &&
             doc.data()?['tip2'] != null &&
@@ -214,9 +228,6 @@ class _HomeScreenState extends State<HomeScreen>
         _nextAdTime = doc.data()?['nextAdTime'] ?? 0;
         _canWatchAd = now >= _nextAdTime;
 
-        if (!_canWatchAd && _nextAdTime > 0) {
-          _startCountdown();
-        }
 
 
         if (!_canWatchAd && _nextAdTime > 0) {
@@ -400,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     _rewardedAd!.show(
       onUserEarnedReward: (_, __) async {
-        await _addPoints(2);
+        await _addPoints(10);
         await _startAdCooldown(); // 🔥 Firebase zapis
       },
     );
@@ -563,7 +574,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (uid == null) return;
 
     final now = DateTime.now();
-    final next = now.add(const Duration(hours: 8));
+    final next = now.add(const Duration(hours: 23));
 
     await _firestore.collection('users').doc(uid).update({
       'nextAdTime': next.millisecondsSinceEpoch,
@@ -586,7 +597,7 @@ class _HomeScreenState extends State<HomeScreen>
     await _localNoti.zonedSchedule(
       999, // ID
       'Ad is available again!',
-      'Watch the ad and earn +2 points.',
+      'Watch the ad and earn +10 points.',
       tz.TZDateTime.from(time, tz.local),
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -814,14 +825,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
 
                   const SizedBox(height: 12),
-
                   // REWARDED AD BUTTON
                   if (_canWatchAd && _rewardedAd != null)
                     Center(
                       child: ElevatedButton.icon(
                         onPressed: _showRewarded,
                         icon: const Icon(Icons.play_circle_fill),
-                        label: const Text("Watch ad for +2 points"),
+                        label: const Text("+10 points"),
                       ),
                     )
                   else if (!_canWatchAd && _adCountdownText.isNotEmpty)
@@ -836,14 +846,63 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         textAlign: TextAlign.center,
                       ),
-                    )
+                    ),
+                  const SizedBox(height: 12),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00150A),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Choose League:",
+                          style: TextStyle(
+                            color: Color(0xFFEFFF8A),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 3.5,
+                          children: [
+                            _leagueButton(context, 'english_league', 'English League'),
+                            _leagueButton(context, 'german_league', 'German League'),
+                            _leagueButton(context, 'french_league', 'French League'),
+                            _leagueButton(context, 'italian_league', 'Italian League'),
+                            _leagueButton(context, 'spanish_league', 'Spanish League'),
+                            _leagueButton(context, 'champions_league', 'Champions League'),
+                            _leagueButton(context, 'confederation_cup', 'Confederation Cup'),
+                            _leagueButton(context, 'europe_league', 'Europe League'),
+                            _leagueButton(context, 'world_cup', 'World Cup'),
+                            _leagueButton(context, 'european_cup', 'European Cup'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+
 
                 ],
               ),
             ),
           ),
 
-          // ===== FOOTER =====
+
+
+
+
+    // ===== FOOTER =====
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: const Color(0xFF011F0A),
@@ -1272,6 +1331,34 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+
+
+  Widget _leagueButton(BuildContext context, String leagueId, String leagueName) {
+    return ElevatedButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LeagueScreenGlobal(
+              leagueId: leagueId,
+              leagueName: leagueName,
+
+            ),
+          ),
+        );
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green[800],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        leagueName,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
       ),
     );
   }

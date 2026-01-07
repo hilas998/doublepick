@@ -19,6 +19,8 @@ import 'screens/AdminLeague.dart';
 import 'screens/LeagueDetail.dart';
 import 'screens/MyLeagues.dart';
 import 'screens/invite_code.dart';
+import 'screens/LeagueScreenGlobal.dart';
+import 'screens/LeagueLeaderboardScreen.dart';
 
 
 
@@ -89,7 +91,6 @@ class MyApp extends StatelessWidget {
         '/myLeagues' : (context) => const MyLeaguesScreen(),
         '/leagueDetail' : (context) => const LeagueDetailScreen(),
         '/adminLeague' : (context) => const AdminLeagueScreen(),
-
 
 
           '/profile': (context) {
