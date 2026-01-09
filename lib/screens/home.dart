@@ -392,6 +392,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (_adConsumedThisSession) return;
 
     _adConsumedThisSession = true;
+    if (_rewardedAd == null) {
+      print("❌ Rewarded ad not ready");
+      return;
+    }
 
     setState(() {
       _canWatchAd = false;
@@ -402,10 +406,12 @@ class _HomeScreenState extends State<HomeScreen>
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _rewardedAd = null;
+        _loadRewarded();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
         _rewardedAd = null;
+        _loadRewarded();
       },
     );
 
@@ -1313,6 +1319,9 @@ class _HomeScreenState extends State<HomeScreen>
             controller: ctrl,
             maxLength: 1, // ✅ SAMO JEDNA CIFRA
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
+            ],
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 22,

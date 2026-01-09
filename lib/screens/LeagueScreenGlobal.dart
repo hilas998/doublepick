@@ -142,9 +142,23 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
         final awayText = m['awayCtrl'].text.trim();
 
 
+
+
+        // ❌ ako bilo koje polje fali
+        if (homeText.isEmpty || awayText.isEmpty) {
+          _showError("You must enter a tip for ALL matches");
+          return;
+        }
+
+        // ❌ ako nije broj
+        if (int.tryParse(homeText) == null ||
+            int.tryParse(awayText) == null) {
+          _showError("Tips must be numbers only");
+          return;
+        }
+
         // Ako nema unosa, preskoči
         if (homeText.isEmpty && awayText.isEmpty) continue;
-
 
 
         userTips[m['matchId']] = {
@@ -190,6 +204,15 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
     }
   }
 
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
 
   void _updatePhase() {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -618,142 +641,124 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
           // ===== MATCH LIST =====
           Expanded(
             child: ListView.builder(
-              itemCount: matches.length,
-              itemBuilder: (_, i) {
-                final m = matches[i];
+              itemCount: matches.length + 1,
 
-                // Preskoči prazne utakmice
-                if ((m['home'] as String).isEmpty && (m['away'] as String).isEmpty) {
-                  return const SizedBox.shrink();
-                }
 
-                return _matchCard(
-                  m['matchId'],
-                  m['home'],
-                  m['away'],
-                  m['resHome'] != null && m['resHome'] >= 0 ? m['resHome'].toString() : "0",
-                  m['resAway'] != null && m['resAway'] >= 0 ? m['resAway'].toString() : "0",
-                  m['homeCtrl'],
-                  m['awayCtrl'],
 
-                );
-              },
+
+
+          itemBuilder: (_, i) {
+
+            // ===== DNO LISTE (SEND + ADMIN) =====
+            if (i == matches.length) {
+              return Column(
+                children: [
+
+                  if (!hasSubmitted && phaseText == "Enrollment time left")
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF44FF96),
+                                Color(0xFFEFFF8A),
+                              ],
+                            ),
+                          ),
+                          child: ElevatedButton(
+                            onPressed: _submitTips,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 40, vertical: 16),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.send_rounded, color: Colors.black),
+                                SizedBox(width: 10),
+                                Text(
+                                  "SEND RESULTS",
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  if (_isAdmin(user))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Column(
+                        children: [
+                          ElevatedButton(
+                            onPressed: () => _calculateRound(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 30, vertical: 16),
+                            ),
+                            child: const Text("CALCULATE ROUND"),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: _resetRound,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 30, vertical: 16),
+                            ),
+                            child: const Text("RESET ROUND"),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: _resetSeason,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple),
+                            child: const Text("RESET SEASON"),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            }
+
+            // ===== MATCH CARD =====
+            final m = matches[i];
+
+            if ((m['home'] as String).isEmpty &&
+                (m['away'] as String).isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return _matchCard(
+              m['matchId'],
+              m['home'],
+              m['away'],
+              m['resHome'] != null && m['resHome'] >= 0
+                  ? m['resHome'].toString()
+                  : "0",
+              m['resAway'] != null && m['resAway'] >= 0
+                  ? m['resAway'].toString()
+                  : "0",
+              m['homeCtrl'],
+              m['awayCtrl'],
+            );
+          },
             ),
           ),
 
-
-          // ===== SEND RESULTS BUTTON =====
-          // SEND RESULTS BUTTON
-          if (!hasSubmitted && phaseText == "Enrollment time left")
-            Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF44FF96),
-                      Color(0xFFEFFF8A),
-                    ],
-                  ),
-                ),
-                child: ElevatedButton(
-                  onPressed: _submitTips,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.send_rounded, color: Colors.black),
-                      SizedBox(width: 10),
-                      Text(
-                        "SEND RESULTS",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          const SizedBox(height: 12),
-
-
-          if (_isAdmin(user))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                children: [
-                  ElevatedButton(
-                    onPressed: () => _calculateRound(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
-                    ),
-                    child: const Text(
-                      "CALCULATE ROUND",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12), // razmak između dugmadi
-                  ElevatedButton(
-                    onPressed: () async {
-                      await _resetRound(); // funkcija koju ćemo napraviti
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
-                    ),
-                    child: const Text(
-                      "RESET ROUND",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  ElevatedButton(
-                    onPressed: () async {
-                      await _resetSeason();
-                      // Opcionalno: refresh UI nakon reset
-                      setState(() {
-                        hasSubmitted = false;
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 16),
-                    ),
-                    child: const Text(
-                      "RESET SEASON",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
