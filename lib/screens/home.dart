@@ -121,16 +121,12 @@ class _HomeScreenState extends State<HomeScreen>
     requestNotificationPermission();
     tz.initializeTimeZones();
     _initializeLocalNotifications();
-
-
-
     _loadUser();
     _loadMatchAndTimer();
-
-
-
     _loadBanner();
     _loadRewarded();
+    _checkAdAvailability();
+
 
     _animController = AnimationController(
       vsync: this,
@@ -161,6 +157,13 @@ class _HomeScreenState extends State<HomeScreen>
 
     _animController.forward();
 
+    if (_rewardedAd == null) {
+      _loadRewarded();
+      return;
+    }
+
+
+
   }
 
   @override
@@ -190,7 +193,12 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAdAvailability();
+    }
+  }
 
 
   // 🔹 Učitavanje korisnika i tipova
@@ -638,6 +646,7 @@ class _HomeScreenState extends State<HomeScreen>
         _countdownTimer?.cancel();
         setState(() {
           _canWatchAd = true;
+          _adConsumedThisSession = false;
           _adCountdownText = "";
         });
 

@@ -115,14 +115,14 @@ class _RulesScreenState extends State<RulesScreen> {
 
                       Text(
 
-                      "1️⃣ Predict the correct score for both matches.\n\n"
+                "1️⃣ Predict the correct score for both matches.\n\n"
 
-                      "2️⃣ Special bonus matches:\n\n"
+                "2️⃣ Special bonus matches:\n\n"
 
                       "   Correct exact score → 20 points\n\n"
                       "   Correct outcome (win/draw/loss) → 7 points\n\n"
 
-                  "3️⃣ Other leagues:\n\n"
+                "3️⃣ Other leagues:\n\n"
 
                   "   Correct exact score → 10 points\n\n"
 
@@ -138,7 +138,8 @@ class _RulesScreenState extends State<RulesScreen> {
 
                 "8️⃣ Each player can create only one league.\n\n"
 
-                  "9️⃣ The app is intended for fun and entertainment only.\n\n",
+                "9️⃣ The app is intended for fun and entertainment only.\n\n"
+                "🔟 If a match is postponed, cancelled, or not played for any reason, the official result will be considered 10:10.\n\n",
                         style: TextStyle(
                           fontSize: 18,
                           height: 1.6,
