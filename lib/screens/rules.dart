@@ -130,7 +130,7 @@ class _RulesScreenState extends State<RulesScreen> {
 
                 "4️⃣ Bonus for both matches correct in special bonus round: +15 points\n\n"
 
-                "5️⃣ Each day you can watch one ad to get 10 bonus points.\n\n"
+                "5️⃣ Each hour you can watch one ad to get 2 bonus points.\n\n"
 
                 "6️⃣ Each league has its own leaderboard, but all points count towards the global score.\n\n"
 

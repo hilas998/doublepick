@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
@@ -12,7 +11,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:doublepick/screens/LeagueScreenGlobal.dart';
 
 
@@ -53,10 +51,13 @@ class _HomeScreenState extends State<HomeScreen>
   BannerAd? _bannerAd;
   RewardedAd? _rewardedAd;
 
+  bool rewardGranted = false;
+
+
 
   String inviteCode = '';
   bool _canWatchAd = false;
-  Timer? _adCooldownTimer;
+  //Timer? _adCooldownTimer;
   int _nextAdTime = 0;
   String _adCountdownText = "";
   Timer? _countdownTimer;
@@ -78,7 +79,6 @@ class _HomeScreenState extends State<HomeScreen>
   StreamSubscription<DocumentSnapshot>? _roundSub;
 
   bool _roundHandledForThisCycle = false;
-  bool _tipsClearedForThisRound = false;
   late AnimationController _animController;
   late AnimationController _pulseController;
 
@@ -168,13 +168,14 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
 
     _connSub.cancel();
     _bannerAd?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
-    _adCooldownTimer?.cancel();
+    //_adCooldownTimer?.cancel();
     _countdownTimer?.cancel();
 
 
@@ -193,10 +194,22 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
+
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkAdAvailability();
+
+      // 🔥 FORCE reload banner
+      _bannerAd?.dispose();
+      _bannerAd = null;
+      _loadBanner();
+
+      // 🔥 ako rewarded ne postoji – učitaj
+      if (_rewardedAd == null && _canWatchAd) {
+        _loadRewarded();
+      }
     }
   }
 
@@ -363,18 +376,27 @@ class _HomeScreenState extends State<HomeScreen>
     final now = DateTime.now().millisecondsSinceEpoch;
     final nextAdTime = doc.data()?['nextAdTime'] ?? 0;
 
-    final canWatch = now >= nextAdTime;
 
-    if (canWatch && !_canWatchAd) {
-      setState(() {
-        _canWatchAd = true;
-      });
 
-      // osiguraj da je reklama učitana
-      if (_rewardedAd == null) {
-        _loadRewarded();
+
+
+    setState(() {
+      _nextAdTime = nextAdTime;
+      _canWatchAd = now >= nextAdTime;
+
+      if (_canWatchAd) {
+        _adConsumedThisSession = false; // 🔥 KRITIČNO
+        _adCountdownText = "";
+      } else {
+        _startCountdown();
       }
+    });
+
+    if (_canWatchAd && _rewardedAd == null) {
+      _loadRewarded();
     }
+
+
   }
 
   void _loadRewarded() {
@@ -399,7 +421,9 @@ class _HomeScreenState extends State<HomeScreen>
     if (_rewardedAd == null) return;
     if (_adConsumedThisSession) return;
 
+    rewardGranted = false;
     _adConsumedThisSession = true;
+
     if (_rewardedAd == null) {
       print("❌ Rewarded ad not ready");
       return;
@@ -413,28 +437,38 @@ class _HomeScreenState extends State<HomeScreen>
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
+
         _rewardedAd = null;
+        if (!rewardGranted) {
+          _adConsumedThisSession = false; // 🔥 VRATI
+        }
         _loadRewarded();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
         _rewardedAd = null;
         _loadRewarded();
+        _adConsumedThisSession = false;
       },
     );
 
     _rewardedAd!.show(
       onUserEarnedReward: (_, __) async {
-        await _addPoints(10);
-        await _startAdCooldown(); // 🔥 Firebase zapis
+        rewardGranted = true;
+        await _addPoints(2);
+        await _startAdCooldown();
       },
     );
+
+
   }
 
 
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
+          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
@@ -548,29 +582,6 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-
-  // === Reklame, internet, referral ===
-
-
-  void _initAds() {
-    _bannerAd = BannerAd(
-      adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-6791458589312613/3522917422'
-          : 'ca-app-pub-6791458589312613/3240411048',
-      size: AdSize.banner, // 🔥 MANJI I LJEPŠI BANNER
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-        },
-      ),
-    )..load();
-
-
-  }
-
-
-
   Future<void> _addPoints(int pts) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -587,11 +598,17 @@ class _HomeScreenState extends State<HomeScreen>
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
+
+
     final now = DateTime.now();
-    final next = now.add(const Duration(hours: 23));
+    final next = now.add(const Duration(hours: 1));
 
     await _firestore.collection('users').doc(uid).update({
       'nextAdTime': next.millisecondsSinceEpoch,
+    });
+    setState(() {
+      _canWatchAd = false;
+      _nextAdTime = next.millisecondsSinceEpoch;
     });
 
     await _scheduleAdAvailableNotification(next);
@@ -846,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen>
                       child: ElevatedButton.icon(
                         onPressed: _showRewarded,
                         icon: const Icon(Icons.play_circle_fill),
-                        label: const Text("+10 points"),
+                        label: const Text("+2 points"),
                       ),
                     )
                   else if (!_canWatchAd && _adCountdownText.isNotEmpty)
@@ -1305,88 +1322,88 @@ class _HomeScreenState extends State<HomeScreen>
       child: Container(
         height: 58,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF22E58B).withOpacity(0.45),
-              blurRadius: 16,
-              spreadRadius: 1,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Container(
-          margin: const EdgeInsets.all(2.2), // okvir efekat
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white,
-          ),
-          child: TextField(
-            controller: ctrl,
-            maxLength: 1, // ✅ SAMO JEDNA CIFRA
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
-            ],
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF00150A),
-            ),
-            decoration: const InputDecoration(
-              counterText: "",
-              hintText: "enter score",
-              hintStyle: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF22E58B),
-                letterSpacing: 1,
-              ),
-              border: InputBorder.none,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+     borderRadius: BorderRadius.circular(18),
+gradient: const LinearGradient(
+colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+),
+boxShadow: [
+BoxShadow(
+color: const Color(0xFF22E58B).withOpacity(0.45),
+blurRadius: 16,
+spreadRadius: 1,
+offset: const Offset(0, 6),
+),
+],
+),
+child: Container(
+margin: const EdgeInsets.all(2.2), // okvir efekat
+decoration: BoxDecoration(
+borderRadius: BorderRadius.circular(16),
+color: Colors.white,
+),
+child: TextField(
+controller: ctrl,
+maxLength: 1, // ✅ SAMO JEDNA CIFRA
+keyboardType: TextInputType.number,
+inputFormatters: [
+FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
+],
+textAlign: TextAlign.center,
+style: const TextStyle(
+fontSize: 22,
+fontWeight: FontWeight.w900,
+color: Color(0xFF00150A),
+),
+decoration: const InputDecoration(
+counterText: "",
+hintText: "enter score",
+hintStyle: TextStyle(
+fontWeight: FontWeight.w800,
+color: Color(0xFF22E58B),
+letterSpacing: 1,
+),
+border: InputBorder.none,
+),
+),
+),
+),
+);
+}
 
 
 
-  Widget _leagueButton(BuildContext context, String leagueId, String leagueName) {
-    return ElevatedButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LeagueScreenGlobal(
-              leagueId: leagueId,
-              leagueName: leagueName,
+Widget _leagueButton(BuildContext context, String leagueId, String leagueName) {
+return ElevatedButton(
+onPressed: () {
+Navigator.push(
+context,
+MaterialPageRoute(
+builder: (_) => LeagueScreenGlobal(
+leagueId: leagueId,
+leagueName: leagueName,
 
-            ),
-          ),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green[800],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(
-        leagueName,
-        textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
+),
+),
+);
+},
+style: ElevatedButton.styleFrom(
+backgroundColor: Colors.green[800],
+shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+),
+child: Text(
+leagueName,
+textAlign: TextAlign.center,
+style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+),
+);
+}
 
 
 
-  void _logout() async {
-  await FirebaseAuth.instance.signOut();
-  if (mounted) Navigator.pushReplacementNamed(context, '/login');
-  }
+void _logout() async {
+await FirebaseAuth.instance.signOut();
+if (mounted) Navigator.pushReplacementNamed(context, '/login');
+}
 
 
 
