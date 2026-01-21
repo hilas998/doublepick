@@ -26,20 +26,36 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.initState();
     _loadRounds();
   }
-  Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
-    final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
+  //Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
+    //final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
+   // setState(() {
+   //  userLeagues = leaguesMap.keys.toList();
+   // if (userLeagues.isNotEmpty) {
+    //   selectedLeagueKey = userLeagues.first;
+    // }
+   // });
+//
+   // if (selectedLeagueKey != null) {
+     // await _loadLeagueRounds(selectedLeagueKey!);
+   // }
+ // }
+Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
+  final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
     setState(() {
       userLeagues = leaguesMap.keys.toList();
       if (userLeagues.isNotEmpty) {
         selectedLeagueKey = userLeagues.first;
       }
     });
+  });
 
-    if (selectedLeagueKey != null) {
-      await _loadLeagueRounds(selectedLeagueKey!);
-    }
-  }
-
+  if (selectedLeagueKey != null) {
+     await _loadLeagueRounds(selectedLeagueKey!);
+     }
+}
   Future<void> _loadLeagueRounds(String leagueKey) async {
     final snap = await FirebaseFirestore.instance
         .collection('users')
