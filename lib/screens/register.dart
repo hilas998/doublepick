@@ -78,7 +78,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final uid = user.uid;
       final userData = {
         "ime": ime,
-        "prezime": prezime,
         "email": email,
         "mobitel": mobitel,
         "password": password,

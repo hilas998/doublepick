@@ -26,36 +26,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.initState();
     _loadRounds();
   }
-  //Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
-    //final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
-   // setState(() {
-   //  userLeagues = leaguesMap.keys.toList();
-   // if (userLeagues.isNotEmpty) {
-    //   selectedLeagueKey = userLeagues.first;
-    // }
-   // });
-//
-   // if (selectedLeagueKey != null) {
-     // await _loadLeagueRounds(selectedLeagueKey!);
-   // }
- // }
-Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
-  final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    setState(() {
-      userLeagues = leaguesMap.keys.toList();
-      if (userLeagues.isNotEmpty) {
-        selectedLeagueKey = userLeagues.first;
-      }
-    });
-  });
 
-  if (selectedLeagueKey != null) {
-     await _loadLeagueRounds(selectedLeagueKey!);
+  Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
+    final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
+   setState(() {
+    userLeagues = leaguesMap.keys.toList();
+    if (userLeagues.isNotEmpty) {
+       selectedLeagueKey = userLeagues.first;
      }
-}
+    });
+
+    if (selectedLeagueKey != null) {
+      await _loadLeagueRounds(selectedLeagueKey!);
+   }
+  }
+
+
   Future<void> _loadLeagueRounds(String leagueKey) async {
     final snap = await FirebaseFirestore.instance
         .collection('users')
@@ -69,6 +56,14 @@ Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
         selectedLeagueRound = leagueRounds.first;
       }
     });
+
+    if (snap.docs.isEmpty) {
+      setState(() {
+        leagueRounds = [];
+        leagueRoundData = null;
+      });
+      return;
+    }
 
     if (selectedLeagueRound != null) {
       await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
@@ -85,6 +80,8 @@ Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
         .collection('${leagueKey}tip1')
         .doc(roundId)
         .get();
+
+
 
     final raw = Map<String, dynamic>.from(doc.data() ?? {});
 
@@ -109,6 +106,8 @@ Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
     setState(() {
       leagueRoundData = filtered;
     });
+
+
   }
 
 
@@ -152,7 +151,21 @@ Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
         builder: (context, snap) {
           if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFFCCFF66)));
           final u = snap.data;
-          if (u == null) return const Center(child: Text("User not found", style: TextStyle(color: Colors.white)));
+          if (u == null) {
+            return const Center(
+              child: Text("User not found", style: TextStyle(color: Colors.white)),
+            );
+          }
+
+
+          if (userLeagues.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _loadUserLeagues(u);
+              }
+            });
+          }
+
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 500),
@@ -376,9 +389,12 @@ Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
   }
 
   Widget _leagueHistory(Map<String, dynamic> userData) {
+
     if (userLeagues.isEmpty) {
-      _loadUserLeagues(userData);
-      return const SizedBox();
+      return const Text(
+        "No league history yet",
+        style: TextStyle(color: Colors.yellow),
+      );
     }
 
     return Column(
