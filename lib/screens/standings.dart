@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,9 +35,13 @@ class _StandingsScreenState extends State<StandingsScreen> {
     _searchController.addListener(_applySearch);
   }
 
+
+
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
+          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
@@ -43,7 +49,6 @@ class _StandingsScreenState extends State<StandingsScreen> {
       ),
     )..load();
   }
-
   Future<void> _loadFavorites() async {
     final snap = await FirebaseFirestore.instance
         .collection('favorites')
