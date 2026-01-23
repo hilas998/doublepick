@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -19,13 +21,13 @@ class _RulesScreenState extends State<RulesScreen> {
 
   void _loadBanner() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-6791458589312613/3522917422',
-      size: AdSize.banner, // 🔥 MANJI BANNER
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
+          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
+      size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose(); // sprječava crash
-        },
+        onAdFailedToLoad: (ad, error) => ad.dispose(),
       ),
     )..load();
   }
