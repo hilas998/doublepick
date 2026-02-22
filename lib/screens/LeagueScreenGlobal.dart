@@ -545,152 +545,193 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
         ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
 
-          // ===== LEAGUE NAME =====
-          Text(
-            widget.leagueName.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFEFFF8A),
-              shadows: [
-                Shadow(color: Colors.yellow, blurRadius: 12),
-              ],
+          // =========================
+          // FIKSIRAN NAZIV LIGE
+          // =========================
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            color: const Color(0xFF00150A),
+            child: Text(
+              widget.leagueName.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEFFF8A),
+                shadows: [
+                  Shadow(color: Colors.yellow, blurRadius: 12),
+                ],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
 
           const SizedBox(height: 12),
 
-          Card(
-            elevation: 4,
-            shadowColor: const Color(0xFF44FF96).withOpacity(0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF022D12),
-                    Color(0xFF011F0A),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+          // =========================
+          // SCROLLABLE SADRŽAJ
+          // =========================
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    phaseText.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      letterSpacing: 1,
-                      color: Color(0xFF44FF96),
-                      fontWeight: FontWeight.bold,
+                  // ===== TIMER CARD =====
+                  Card(
+                    elevation: 4,
+                    shadowColor: const Color(0xFF44FF96).withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "${h.toString().padLeft(2, '0')}:"
-                        "${m.toString().padLeft(2, '0')}:"
-                        "${s.toString().padLeft(2, '0')}",
-                    style: const TextStyle(
-                      color: Color(0xFFEFFF8A),
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => LeagueLeaderboardScreen(
-                    leagueName: widget.leagueName,
-                    leagueId: widget.leagueId,
-                  ),
-                ),
-              );
-            },
-            child: const Text(
-              "Standings league",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-
-
-
-          // ===== MATCH LIST =====
-          Expanded(
-            child: ListView.builder(
-              itemCount: matches.length + 1,
-
-
-
-
-
-          itemBuilder: (_, i) {
-
-            // ===== DNO LISTE (SEND + ADMIN) =====
-            if (i == matches.length) {
-              return Column(
-                children: [
-
-                  if (!hasSubmitted && phaseText == "Enrollment time left")
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF44FF96),
-                                Color(0xFFEFFF8A),
-                              ],
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF022D12),
+                            Color(0xFF011F0A),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            phaseText.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 1,
+                              color: Color(0xFF44FF96),
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          child: ElevatedButton(
-                            onPressed: _submitTips,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 40, vertical: 16),
+                          const SizedBox(height: 6),
+                          Text(
+                            "${h.toString().padLeft(2, '0')}:"
+                                "${m.toString().padLeft(2, '0')}:"
+                                "${s.toString().padLeft(2, '0')}",
+                            style: const TextStyle(
+                              color: Color(0xFFEFFF8A),
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.send_rounded, color: Colors.black),
-                                SizedBox(width: 10),
-                                Text(
-                                  "SEND RESULTS",
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ===== STANDINGS BUTTON =====
+                  Center(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LeagueLeaderboardScreen(
+                              leagueName: widget.leagueName,
+                              leagueId: widget.leagueId,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.emoji_events, color: Colors.black),
+                      label: const Text(
+                        "Standings League",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade400,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ===== MATCH LIST =====
+                  ListView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    itemCount: matches.length,
+                    itemBuilder: (_, i) {
+                      final m = matches[i];
+
+                      if ((m['home'] as String).isEmpty &&
+                          (m['away'] as String).isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return _matchCard(
+                        m['matchId'],
+                        m['home'],
+                        m['away'],
+                        m['resHome'] != null && m['resHome'] >= 0
+                            ? m['resHome'].toString()
+                            : "0",
+                        m['resAway'] != null && m['resAway'] >= 0
+                            ? m['resAway'].toString()
+                            : "0",
+                        m['homeCtrl'],
+                        m['awayCtrl'],
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ===== SEND BUTTON & ADMIN CONTROLS =====
+                  if (!hasSubmitted && phaseText == "Enrollment time left")
+                    Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF44FF96),
+                              Color(0xFFEFFF8A),
+                            ],
+                          ),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _submitTips,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 40, vertical: 16),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send_rounded, color: Colors.black),
+                              SizedBox(width: 10),
+                              Text(
+                                "SEND RESULTS",
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -698,7 +739,7 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
 
                   if (_isAdmin(user))
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.only(top: 16, bottom: 24),
                       child: Column(
                         children: [
                           ElevatedButton(
@@ -731,40 +772,13 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
                       ),
                     ),
                 ],
-              );
-            }
-
-            // ===== MATCH CARD =====
-            final m = matches[i];
-
-            if ((m['home'] as String).isEmpty &&
-                (m['away'] as String).isEmpty) {
-              return const SizedBox.shrink();
-            }
-
-            return _matchCard(
-              m['matchId'],
-              m['home'],
-              m['away'],
-              m['resHome'] != null && m['resHome'] >= 0
-                  ? m['resHome'].toString()
-                  : "0",
-              m['resAway'] != null && m['resAway'] >= 0
-                  ? m['resAway'].toString()
-                  : "0",
-              m['homeCtrl'],
-              m['awayCtrl'],
-            );
-          },
+              ),
             ),
           ),
-
         ],
       ),
     );
   }
-
-
   Widget _matchCard(
       String matchId,
       String homeTeam,
