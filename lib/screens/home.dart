@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen>
   String phaseText = '';
 
   BannerAd? _bannerAd;
+  BannerAd? _bannerAd2;
   RewardedAd? _rewardedAd;
 
   bool rewardGranted = false;
@@ -88,17 +89,20 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-  final List<Map<String, String>> leagues = const [
-    {'id': 'english_league', 'name': 'English League'},
-    {'id': 'german_league', 'name': 'German League'},
-    {'id': 'french_league', 'name': 'French League'},
-    {'id': 'italian_league', 'name': 'Italian League'},
-    {'id': 'spanish_league', 'name': 'Spanish League'},
-    {'id': 'champions_league', 'name': 'Champions League'},
-    {'id': 'confederation_cup', 'name': 'Confederation Cup'},
-    {'id': 'europe_league', 'name': 'Europe League'},
-    {'id': 'world_cup', 'name': 'World Cup'},
-    {'id': 'european_cup', 'name': 'European Cup'},
+
+
+
+  final List<Map<String, dynamic>> leagues = [
+    {'id': 'english_league', 'name': 'English League','icon': Icons.flag },
+    {'id': 'german_league', 'name': 'German League', 'icon': Icons.sports_soccer},
+    {'id': 'french_league', 'name': 'French League', 'icon': Icons.emoji_events},
+    {'id': 'italian_league', 'name': 'Italian League', 'icon': Icons.shield},
+    {'id': 'spanish_league', 'name': 'Spanish League', 'icon': Icons.sports},
+    {'id': 'champions_league', 'name': 'Champions League', 'icon': Icons.star},
+    {'id': 'conference_league', 'name': 'Conference League', 'icon': Icons.public},
+    {'id': 'europa_league', 'name': 'Europa League', 'icon': Icons.workspace_premium},
+    {'id': 'world_cup', 'name': 'World Cup', 'icon': Icons.public},
+    {'id': 'european_cup', 'name': 'European Cup', 'icon': Icons.emoji_events},
   ];
 
 
@@ -124,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen>
     _loadUser();
     _loadMatchAndTimer();
     _loadBanner();
+    _loadBanner2();
     _loadRewarded();
     _checkAdAvailability();
 
@@ -172,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     _connSub.cancel();
     _bannerAd?.dispose();
+    _bannerAd2?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
@@ -205,6 +211,11 @@ class _HomeScreenState extends State<HomeScreen>
       _bannerAd?.dispose();
       _bannerAd = null;
       _loadBanner();
+
+      // 🔥 FORCE reload banner
+      _bannerAd2?.dispose();
+      _bannerAd2 = null;
+      _loadBanner2();
 
       // 🔥 ako rewarded ne postoji – učitaj
       if (_rewardedAd == null && _canWatchAd) {
@@ -461,6 +472,19 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
 
+  }
+
+  void _loadBanner2() {
+    _bannerAd2 = BannerAd(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
+          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) => ad.dispose(),
+      ),
+    )..load();
   }
 
 
@@ -738,24 +762,9 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // HEADER
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeOutCubic,
-                    tween: Tween(begin: 0, end: 1),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 24 * (1 - value)),
-                        child: child,
-                      ),
-                    ),
-                    child: _headerCard(context),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // PHASE + TIMER CARD
+                  // =========================
+                  // PHASE + TIMER (SADA PRVI)
+                  // =========================
                   Card(
                     elevation: 4,
                     shadowColor: const Color(0xFF44FF96).withOpacity(0.4),
@@ -806,14 +815,18 @@ class _HomeScreenState extends State<HomeScreen>
 
                   const SizedBox(height: 20),
 
-                  // ===== MATCH CARDS WITH INPUTS =====
+                  // =========================
+                  // MATCH CARDS
+                  // =========================
                   _matchCard(team1, team2, rez1, rez2, tip1Ctrl, tip2Ctrl),
                   const SizedBox(height: 8),
                   _matchCard(team3, team4, rez3, rez4, tip3Ctrl, tip4Ctrl),
 
                   const SizedBox(height: 16),
 
-                  // SEND RESULTS BUTTON
+                  // =========================
+                  // SEND BUTTON
+                  // =========================
                   if (!hasSubmitted && phaseText == "Enrollment time left")
                     Center(
                       child: Container(
@@ -857,7 +870,10 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
 
                   const SizedBox(height: 12),
-                  // REWARDED AD BUTTON
+
+                  // =========================
+                  // REWARDED BUTTON
+                  // =========================
                   if (_canWatchAd && _rewardedAd != null)
                     Center(
                       child: ElevatedButton.icon(
@@ -879,51 +895,158 @@ class _HomeScreenState extends State<HomeScreen>
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  const SizedBox(height: 12),
 
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00150A),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Choose League:",
-                          style: TextStyle(
-                            color: Color(0xFFEFFF8A),
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  const SizedBox(height: 20),
+
+                  // =========================
+                  // CHOOSE LEAGUE
+                  // =========================
+                  // =========================
+// LEAGUES SECTION (MODERNO)
+// =========================
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "SELECT LEAGUE",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFEFFF8A),
+                          letterSpacing: 1.2,
                         ),
-                        const SizedBox(height: 8),
-                        GridView.count(
+                      ),
+                      const SizedBox(height: 12),
+
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: leagues.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 3.5,
-                          children: [
-                            _leagueButton(context, 'english_league', 'English League'),
-                            _leagueButton(context, 'german_league', 'German League'),
-                            _leagueButton(context, 'french_league', 'French League'),
-                            _leagueButton(context, 'italian_league', 'Italian League'),
-                            _leagueButton(context, 'spanish_league', 'Spanish League'),
-                            _leagueButton(context, 'champions_league', 'Champions League'),
-                            _leagueButton(context, 'conference_league', 'Conference League'),
-                            _leagueButton(context, 'europa_league', 'Europa League'),
-                            _leagueButton(context, 'world_cup', 'World Cup'),
-                            _leagueButton(context, 'european_cup', 'European Cup'),
-                          ],
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 1.8,
                         ),
-                      ],
+                        itemBuilder: (context, index) {
+                          final league = leagues[index];
+                          return _modernLeagueCard(
+                            context,
+                            league['id'],
+                            league['name'],
+                            league['icon'],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+
+                  // ===== BANNER AD =====
+                  // ===== BANNER AD (IZMEĐU GRID I HEADER) =====
+                  if (_bannerAd != null)
+                    Center(
+                      child: SizedBox(
+                        width: _bannerAd!.size.width.toDouble(),
+                        height: _bannerAd!.size.height.toDouble(),
+                        child: AdWidget(ad: _bannerAd!),
+                      ),
                     ),
+                  const SizedBox(height: 20),
+
+                  // =========================
+                  // HEADER PREBAČEN NA DNO
+                  // =========================
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    tween: Tween(begin: 0, end: 1),
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 24 * (1 - value)),
+                        child: child,
+                      ),
+                    ),
+                    child: _headerCard(context),
                   ),
 
+                  const SizedBox(height: 20),
 
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ... sve ostalo, faze, mečevi, ligе, header, itd.
+
+                      const SizedBox(height: 20),
+
+                      // ===== INVITE CODE & SHARE =====
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF011F0A),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Invite code: $inviteCode",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Color(0xFF44FF96),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: inviteCode));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Invite code copied!")),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.copy),
+                                  label: const Text("Copy", style: TextStyle(fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Share.share(
+                                      "Join DoublePick! Your invite code is: $inviteCode",
+                                    );
+                                  },
+                                  icon: const Icon(Icons.share),
+                                  label: const Text("Share", style: TextStyle(fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+
+                      if (_bannerAd2 != null)
+                        Center(
+                          child: SizedBox(
+                            width: _bannerAd2!.size.width.toDouble(),
+                            height: _bannerAd2!.size.height.toDouble(),
+                            child: AdWidget(ad: _bannerAd2!),
+                          ),
+                        ),
+
+
+                      const SizedBox(height: 20), // padding na kraj scrolla
+                    ],
+                  ),
 
                 ],
               ),
@@ -933,75 +1056,80 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-
-    // ===== FOOTER =====
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: const Color(0xFF011F0A),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    "Invite code: $inviteCode",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFF44FF96),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: inviteCode),
-                        );
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                            content: Text("Invite code copied!"),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.copy),
-                      label: const Text(
-                        "Copy",
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Share.share(
-                          "Join DoublePick! Your invite code is: $inviteCode",
-                        );
-                      },
-                      icon: const Icon(Icons.share),
-                      label: const Text(
-                        "Share",
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
 
-      // ===== BANNER AD =====
-      bottomNavigationBar: _bannerAd == null
-          ? null
-          : SafeArea(
-        child: SizedBox(
-          width: _bannerAd!.size.width.toDouble(),
-          height: _bannerAd!.size.height.toDouble(),
-          child: AdWidget(ad: _bannerAd!),
+
+
+    );
+  }
+
+
+
+
+  Widget _modernLeagueCard(
+      BuildContext context,
+      String leagueId,
+      String leagueName,
+      IconData icon,
+      ) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LeagueScreenGlobal(
+              leagueId: leagueId,
+              leagueName: leagueName,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF022D12),
+              Color(0xFF014421),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF44FF96).withOpacity(0.4),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(
+            color: const Color(0xFF44FF96).withOpacity(0.4),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 26,
+                color: const Color(0xFF44FF96),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                leagueName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFEFFF8A),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1370,33 +1498,6 @@ border: InputBorder.none,
 );
 }
 
-
-
-Widget _leagueButton(BuildContext context, String leagueId, String leagueName) {
-return ElevatedButton(
-onPressed: () {
-Navigator.push(
-context,
-MaterialPageRoute(
-builder: (_) => LeagueScreenGlobal(
-leagueId: leagueId,
-leagueName: leagueName,
-
-),
-),
-);
-},
-style: ElevatedButton.styleFrom(
-backgroundColor: Colors.green[800],
-shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-),
-child: Text(
-leagueName,
-textAlign: TextAlign.center,
-style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-),
-);
-}
 
 
 
