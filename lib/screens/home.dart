@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen>
   String phaseText = '';
 
   BannerAd? _bannerAd;
-  BannerAd? _bannerAd2;
+
   RewardedAd? _rewardedAd;
 
   bool rewardGranted = false;
@@ -58,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   String inviteCode = '';
   bool _canWatchAd = false;
-  //Timer? _adCooldownTimer;
   int _nextAdTime = 0;
   String _adCountdownText = "";
   Timer? _countdownTimer;
@@ -128,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen>
     _loadUser();
     _loadMatchAndTimer();
     _loadBanner();
-    _loadBanner2();
     _loadRewarded();
     _checkAdAvailability();
 
@@ -177,11 +175,9 @@ class _HomeScreenState extends State<HomeScreen>
 
     _connSub.cancel();
     _bannerAd?.dispose();
-    _bannerAd2?.dispose();
     _rewardedAd?.dispose();
     _roundSub?.cancel();
     timer?.cancel();
-    //_adCooldownTimer?.cancel();
     _countdownTimer?.cancel();
 
 
@@ -212,10 +208,7 @@ class _HomeScreenState extends State<HomeScreen>
       _bannerAd = null;
       _loadBanner();
 
-      // 🔥 FORCE reload banner
-      _bannerAd2?.dispose();
-      _bannerAd2 = null;
-      _loadBanner2();
+
 
       // 🔥 ako rewarded ne postoji – učitaj
       if (_rewardedAd == null && _canWatchAd) {
@@ -239,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen>
         _adConsumedThisSession = false;
 
 
+        inviteCode = doc['inviteCode'] ?? _auth.currentUser!.uid.substring(0, 6);
         hasSubmitted = doc.data()?['tip1'] != null &&
             doc.data()?['tip2'] != null &&
             doc.data()?['tip3'] != null &&
@@ -268,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen>
 
       });
 
-      inviteCode = doc['inviteCode'] ?? _auth.currentUser!.uid.substring(0, 6);
+
     }
   }
 
@@ -474,19 +468,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   }
 
-  void _loadBanner2() {
-    _bannerAd2 = BannerAd(
-      adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
-          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdFailedToLoad: (ad, error) => ad.dispose(),
-      ),
-    )..load();
-  }
-
 
   void _loadBanner() {
     _bannerAd = BannerAd(
@@ -601,7 +582,47 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
 
+  Future<void> _deleteAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete account"),
+        content: const Text(
+          "This will permanently delete your account and score. Continue?",
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final uid = user.uid;
+
+      // obriši Firestore podatke
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+
+      // obriši auth nalog
+      await user.delete();
+
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Re-login required before deleting account")),
+      );
+    }
+  }
 
 
 
@@ -1034,15 +1055,33 @@ class _HomeScreenState extends State<HomeScreen>
                       const SizedBox(height: 20),
 
 
-                      if (_bannerAd2 != null)
-                        Center(
-                          child: SizedBox(
-                            width: _bannerAd2!.size.width.toDouble(),
-                            height: _bannerAd2!.size.height.toDouble(),
-                            child: AdWidget(ad: _bannerAd2!),
+                      const SizedBox(height: 30),
+
+                      Center(
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          child: ElevatedButton(
+                            onPressed: _deleteAccount,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              "DELETE ACCOUNT",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
                           ),
                         ),
+                      ),
 
+                      const SizedBox(height: 40),
 
                       const SizedBox(height: 20), // padding na kraj scrolla
                     ],
