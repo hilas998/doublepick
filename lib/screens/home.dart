@@ -108,15 +108,23 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _connSub = Connectivity().onConnectivityChanged.listen((results) {
-      final hasInternet = results.any(
-            (r) => r == ConnectivityResult.mobile || r == ConnectivityResult.wifi,
-      );
 
-      if (!hasInternet && mounted) {
-        _showNoInternetDialog();
-      }
-    });
+
+
+
+   // Future.delayed(const Duration(seconds: 2), () {
+   //   _connSub = Connectivity().onConnectivityChanged.listen((results) {
+   //     final hasInternet = results.any(
+    //          (r) => r == ConnectivityResult.mobile ||
+    //          r == ConnectivityResult.wifi,
+     //   );
+
+     //   if (!hasInternet && mounted) {
+     //     _verifyRealConnection();
+     //   }
+    //  });
+   // });
+
 
     WidgetsBinding.instance.addObserver(this);
     MobileAds.instance.initialize();
@@ -624,8 +632,18 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-
-
+  //Future<void> _verifyRealConnection() async {
+    //try {
+    //  final result = await InternetAddress.lookup('google.com');
+    //  if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+      //  return; // Internet postoji – ne prikazuj dialog
+   //   }
+  //  } catch (_) {
+  //    if (mounted) {
+    //    _showNoInternetDialog();
+     // }
+   // }
+//  }
 
   Future<void> _addPoints(int pts) async {
     final uid = _auth.currentUser?.uid;

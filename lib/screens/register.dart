@@ -15,7 +15,6 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _ime = TextEditingController();
   final _prezime = TextEditingController();
-  final _mobitel = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
 
@@ -26,7 +25,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _register() async {
     final ime = _ime.text.trim();
     final prezime = _prezime.text.trim();
-    final mobitel = _mobitel.text.trim();
     final email = _email.text.trim();
     final password = _password.text.trim();
 
@@ -36,10 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (ime.isEmpty) return _show("Enter name");
     if (prezime.isEmpty) return _show("Enter surname");
-
-
-    final mobRegex = RegExp(r"^[0-9]{9,15}$"); // minimalno 9, maksimalno 15 cifara
-    if (!mobRegex.hasMatch(mobitel)) return _show("Enter valid mobile number");
 
 
     final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
@@ -80,7 +74,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "ime": ime,
         "prezime": prezime,
         "email": email,
-        "mobitel": mobitel,
         "userIDText": uid,
         "score": "0",
         "referralUsed": false,
@@ -114,7 +107,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _ime.dispose();
     _prezime.dispose();
-    _mobitel.dispose();
     _email.dispose();
     _password.dispose();
     super.dispose();
@@ -229,13 +221,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _input(_ime, Icons.person, hint: "Name"),
                       const SizedBox(height: 14),
                       _input(_prezime, Icons.person, hint: "Surname"),
-                      const SizedBox(height: 14),
-                      _input(
-                        _mobitel,
-                        Icons.phone,
-                        hint: "Mobile",
-                        type: TextInputType.number,
-                      ),
                       const SizedBox(height: 14),
                       _input(
                         _email,
