@@ -66,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 
   bool _adConsumedThisSession = false;
+  InterstitialAd? _interstitialAd;
 
 
 
@@ -112,18 +113,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-   // Future.delayed(const Duration(seconds: 2), () {
-   //   _connSub = Connectivity().onConnectivityChanged.listen((results) {
-   //     final hasInternet = results.any(
-    //          (r) => r == ConnectivityResult.mobile ||
-    //          r == ConnectivityResult.wifi,
-     //   );
-
-     //   if (!hasInternet && mounted) {
-     //     _verifyRealConnection();
-     //   }
-    //  });
-   // });
+   
 
 
     WidgetsBinding.instance.addObserver(this);
@@ -188,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen>
     timer?.cancel();
     _countdownTimer?.cancel();
 
+    _loadInterstitialAd();
 
 
     for (var c in [tip1Ctrl, tip2Ctrl, tip3Ctrl, tip4Ctrl]) {
@@ -476,6 +467,40 @@ class _HomeScreenState extends State<HomeScreen>
 
   }
 
+  void _loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/6040084377' // STAVI SVOJ ID
+          : 'ca-app-pub-6791458589312613/7153855495',
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          _interstitialAd = null;
+        },
+      ),
+    );
+  }
+  void _showInterstitialAd() {
+    if (_interstitialAd == null) return;
+
+    _interstitialAd!.fullScreenContentCallback =
+        FullScreenContentCallback(
+          onAdDismissedFullScreenContent: (ad) {
+            ad.dispose();
+            _interstitialAd = null;
+            _loadInterstitialAd(); // reload
+          },
+          onAdFailedToShowFullScreenContent: (ad, error) {
+            ad.dispose();
+            _interstitialAd = null;
+          },
+        );
+
+    _interstitialAd!.show();
+  }
 
   void _loadBanner() {
     _bannerAd = BannerAd(
@@ -585,6 +610,10 @@ class _HomeScreenState extends State<HomeScreen>
       'tip4': tip4Ctrl.text.trim(),
     });
     setState(() => hasSubmitted = true);
+
+
+    _showInterstitialAd();
+
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Predictions submitted!')));
   }
@@ -632,19 +661,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  //Future<void> _verifyRealConnection() async {
-    //try {
-    //  final result = await InternetAddress.lookup('google.com');
-    //  if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-      //  return; // Internet postoji – ne prikazuj dialog
-   //   }
-  //  } catch (_) {
-  //    if (mounted) {
-    //    _showNoInternetDialog();
-     // }
-   // }
-//  }
-
   Future<void> _addPoints(int pts) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -664,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 
     final now = DateTime.now();
-    final next = now.add(const Duration(hours: 1));
+    final next = now.add(const Duration(hours: 12));
 
     await _firestore.collection('users').doc(uid).update({
       'nextAdTime': next.millisecondsSinceEpoch,
@@ -691,7 +707,7 @@ class _HomeScreenState extends State<HomeScreen>
     await _localNoti.zonedSchedule(
       999, // ID
       'Ad is available again!',
-      'Watch the ad and earn +10 points.',
+      'Watch the ad and earn +2 points.',
       tz.TZDateTime.from(time, tz.local),
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -702,19 +718,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
 
-  void _showNoInternetDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("No Internet Connection"),
-        content:
-        const Text("Internet connection is required to use DoublePick."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))
-        ],
-      ),
-    );
-  }
+
   void _startCountdown() {
     _countdownTimer?.cancel();
 

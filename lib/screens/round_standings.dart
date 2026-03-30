@@ -26,7 +26,8 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
     super.initState();
     _loadBanner();
     _loadTotalRounds();
-    _loadRoundStandings(_selectedRound);
+    //_loadRoundStandings(_selectedRound);
+
   }
 
   void _loadBanner() {
@@ -42,11 +43,22 @@ class _RoundStandingsScreenState extends State<RoundStandingsScreen> {
     )..load();
   }
 
+
   Future<void> _loadTotalRounds() async {
-    final metaDoc = await FirebaseFirestore.instance.collection('meta').doc('config').get();
+    final metaDoc = await FirebaseFirestore.instance
+        .collection('meta')
+        .doc('config')
+        .get();
+
+    final lastRound = metaDoc.data()?['currentRound'] ?? 1;
+
     setState(() {
-      _totalRounds = metaDoc.data()?['currentRound'] ?? 1;
+      _totalRounds = lastRound;
+      _selectedRound = lastRound; // ✅ postavi zadnji round
     });
+
+    // ✅ odmah učitaj taj round
+    _loadRoundStandings(lastRound);
   }
 
   Future<void> _loadRoundStandings(int roundNumber) async {
