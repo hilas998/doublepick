@@ -127,6 +127,7 @@ class _HomeScreenState extends State<HomeScreen>
     _loadBanner();
     _loadRewarded();
     _checkAdAvailability();
+    _loadInterstitialAd();
 
 
     _animController = AnimationController(
@@ -178,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen>
     timer?.cancel();
     _countdownTimer?.cancel();
 
-    _loadInterstitialAd();
+    _interstitialAd?.dispose();
 
 
     for (var c in [tip1Ctrl, tip2Ctrl, tip3Ctrl, tip4Ctrl]) {
@@ -591,6 +592,7 @@ class _HomeScreenState extends State<HomeScreen>
         const SnackBar(content: Text('Fill in all 4 entries')),
       );
       return;
+
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -611,8 +613,11 @@ class _HomeScreenState extends State<HomeScreen>
     });
     setState(() => hasSubmitted = true);
 
-
-    _showInterstitialAd();
+    if (_interstitialAd != null) {
+      _showInterstitialAd();
+    } else {
+      _loadInterstitialAd(); // učitaj za sljedeći put
+    }
 
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Predictions submitted!')));
