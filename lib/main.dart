@@ -18,7 +18,11 @@ import 'screens/favorites_screen.dart';
 import 'screens/AdminLeague.dart';
 import 'screens/LeagueDetail.dart';
 import 'screens/MyLeagues.dart';
-
+import 'screens/BonusGameScreenAdmin.dart';
+import 'screens/LeagueScreenGlobal.dart';
+import 'screens/LaguesGameScreenAdmin.dart';
+import 'screens/Teamupisadmin.dart';
+import 'screens/UpisTeamSezona.dart';
 
 
 
@@ -89,6 +93,10 @@ class MyApp extends StatelessWidget {
         '/myLeagues' : (context) => const MyLeaguesScreen(),
         '/leagueDetail' : (context) => const LeagueDetailScreen(),
         '/adminLeague' : (context) => const AdminLeagueScreen(),
+        '/bonusGameAdmin': (context) => const BonusGameScreen(),
+        '/leaguesAdmin': (context) => const LaguesGameScreen(),
+        '/leaguesAdminTeam':(context)=> const Teamupisadmin(),
+        '/upisTimovaSezone':(context)=> const UpisTeamSezona(),
 
 
           '/profile': (context) {

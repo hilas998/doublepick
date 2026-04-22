@@ -21,25 +21,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Map<String, dynamic>? leagueRoundData;
 
 
+
   @override
   void initState() {
     super.initState();
     _loadRounds();
+
   }
 
 
   Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
     final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
-   setState(() {
-    userLeagues = leaguesMap.keys.toList();
-    if (userLeagues.isNotEmpty) {
-       selectedLeagueKey = userLeagues.first;
-     }
+    setState(() {
+      userLeagues = leaguesMap.keys.toList();
+      if (userLeagues.isNotEmpty) {
+        selectedLeagueKey = userLeagues.first;
+      }
     });
+
 
     if (selectedLeagueKey != null) {
       await _loadLeagueRounds(selectedLeagueKey!);
-   }
+      //await _loadProfileMatches(selectedLeagueKey!);
+    }
   }
 
 
@@ -69,7 +73,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
     }
   }
-
 
 
 
@@ -313,11 +316,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // ===== MATCH CARDS (modern style) =====
                 _matchCard("Match 1", u['tip1'] ?? "-", u['tip2'] ?? "-"),
                 const SizedBox(height: 12),
                 _matchCard("Match 2", u['tip3'] ?? "-", u['tip4'] ?? "-"),
-
+                const SizedBox(height: 12),
               ],
             ),
           ),

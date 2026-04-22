@@ -196,8 +196,13 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
 
 
 
+
       setState(() {
         hasSubmitted = true; // blokira unos
+
+        // 🔥 odmah popuni lokalnu mapu
+        unsentTips = userTips;
+        unsentLoaded = true;
       });
     } catch (e) {
       print("Error saving tips: $e");
@@ -683,12 +688,8 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
                         m['matchId'],
                         m['home'],
                         m['away'],
-                        m['resHome'] != null && m['resHome'] >= 0
-                            ? m['resHome'].toString()
-                            : "0",
-                        m['resAway'] != null && m['resAway'] >= 0
-                            ? m['resAway'].toString()
-                            : "0",
+                        m['resHome'] ?? -1,
+                        m['resAway'] ?? -1,
                         m['homeCtrl'],
                         m['awayCtrl'],
                       );
@@ -783,8 +784,10 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
       String matchId,
       String homeTeam,
       String awayTeam,
-      String homeResult,
-      String awayResult,
+    //  String homeResult,
+     // String awayResult,
+      int homeResult,
+      int awayResult,
       TextEditingController homeCtrl,
       TextEditingController awayCtrl,
       ) {
@@ -825,7 +828,8 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
                   ),
                 ),
                 Text(
-                  "$homeResult : $awayResult", // ❌ NEMA KAPSULE
+                  "${homeResult == -1 ? "" : homeResult} : ${awayResult == -1 ? "" : awayResult}",
+
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

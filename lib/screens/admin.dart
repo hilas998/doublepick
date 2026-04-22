@@ -6,11 +6,22 @@ class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
 
   // ❗ DOZVOLJEN SAMO TVOJI EMAIL
+//  bool _isAdmin(User? user) {
+ //   if (user == null) return false;
+   // return user.email == "salihlihic998@gmail.com";
+  //}
+
+
   bool _isAdmin(User? user) {
     if (user == null) return false;
-    return user.email == "salihlihic998@gmail.com";
-  }
 
+    const admins = [
+      "salihlihic998@gmail.com",
+      "sumejahasanic@gmail.com",
+    ];
+
+    return admins.contains(user.email);
+  }
   // ================================
   //        CALCULATE ROUND
   // ================================
@@ -258,7 +269,72 @@ class AdminScreen extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(height: 30),
 
+    ElevatedButton(
+    onPressed:  () {
+    Navigator.pushNamed(context, '/leaguesAdmin');
+    },
+    style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.red,
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    ),
+    child: const Text(
+    "Score upis",
+    style: TextStyle(fontSize: 18),
+    ),
+    ),
+
+            const SizedBox(height: 30),
+
+            ElevatedButton(
+              onPressed:  () {
+                Navigator.pushNamed(context, '/leaguesAdminTeam');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+              ),
+              child: const Text(
+                "Upis Team",
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+
+
+            ElevatedButton(
+      onPressed:  () {
+        Navigator.pushNamed(context, '/bonusGameAdmin');
+      },
+    style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.red,
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    ),
+    child: const Text(
+    "Bonus Game",
+    style: TextStyle(fontSize: 18),
+    ),
+    ),
+            const SizedBox(height: 30),
+
+            ElevatedButton(
+              onPressed:  () {
+                Navigator.pushNamed(context, '/upisTimovaSezone');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+              ),
+              child: const Text(
+                "Upis Sezone",
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+
+            const SizedBox(height: 30),
 
 
 

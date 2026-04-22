@@ -117,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 
     WidgetsBinding.instance.addObserver(this);
-    MobileAds.instance.initialize();
+   // MobileAds.instance.initialize();
 
     requestNotificationPermission();
     tz.initializeTimeZones();
