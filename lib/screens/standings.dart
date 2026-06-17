@@ -88,7 +88,9 @@ class _StandingsScreenState extends State<StandingsScreen> {
   Future<void> _loadLeaderboard() async {
     final db = FirebaseFirestore.instance;
     final auth = FirebaseAuth.instance;
-    final currentEmail = auth.currentUser?.email ?? "";
+
+
+    final currentUid = auth.currentUser?.uid ?? "";
 
     final snapshot = await db.collection('users').get();
 
@@ -107,12 +109,16 @@ class _StandingsScreenState extends State<StandingsScreen> {
 
     users.sort((a, b) => b['score'].compareTo(a['score']));
 
+
     int? pos;
     for (int i = 0; i < users.length; i++) {
-      if (users[i]['email'] == currentEmail) {
+      if (users[i]['uid'] == currentUid) {
         pos = i + 1;
+        break;
       }
     }
+
+
 
     setState(() {
       _users = users;
@@ -223,6 +229,17 @@ class _StandingsScreenState extends State<StandingsScreen> {
 
           const SizedBox(height: 16),
 
+          // MY POSITION
+          if (_myPosition != null)
+            Text(
+              "Your position: $_myPosition / ${_users.length}",
+              style: const TextStyle(
+                fontSize: 18,
+                color: Color(0xFF44FF96),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          const SizedBox(height: 12),
           // RANK LIST
           Expanded(
             child: Container(
@@ -239,7 +256,8 @@ class _StandingsScreenState extends State<StandingsScreen> {
                 itemBuilder: (context, index) {
                   final user = _filteredUsers[index];
                   final rank = _users.indexWhere((u) => u['uid'] == user['uid']) + 1;
-                  final isMe = _myPosition == rank;
+                 // final isMe = _myPosition == rank;
+                  final isMe = user['uid'] == currentUserId;
 
                   return InkWell(
                     onTap: () => Navigator.pushNamed(context, '/profile', arguments: user['uid']),
@@ -335,17 +353,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
 
           const SizedBox(height: 14),
 
-          // MY POSITION
-          if (_myPosition != null)
-            Text(
-              "Your position: $_myPosition / ${_users.length}",
-              style: const TextStyle(
-                fontSize: 18,
-                color: Color(0xFF44FF96),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          const SizedBox(height: 12),
+
 
           // FAVORITES BUTTON
           ElevatedButton.icon(
