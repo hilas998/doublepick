@@ -190,11 +190,11 @@ class _SplashScreenState extends State<SplashScreen> {
     print("Splash build");
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Image.asset(
-          'assets/images/logo_firme.png',
-          width: 200,
+      backgroundColor: Colors.white,
+      body: const Center(
+        child: Text(
+          "LOADING",
+          style: TextStyle(fontSize: 30, color: Colors.black),
         ),
       ),
     );
