@@ -39,7 +39,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  print("========== APP START ==========");
 
+  print("1 - Widgets initialized");
   // 🔹 Registracija background handlera
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -50,6 +52,33 @@ void main() async {
   RemoteMessage? initialMessage = await messaging.getInitialMessage();
 
   runApp(MyApp(initialMessage: initialMessage));
+
+
+
+  try {
+    await Firebase.initializeApp();
+    print("2 - Firebase initialized");
+  } catch (e, s) {
+    print("FIREBASE ERROR:");
+    print(e);
+    print(s);
+    rethrow;
+  }
+
+  FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler);
+  print("3 - Background handler registered");
+
+  try {
+    await MobileAds.instance.initialize();
+    print("4 - Mobile Ads initialized");
+  } catch (e, s) {
+    print("ADMOB ERROR:");
+    print(e);
+    print(s);
+  }
+
+
 }
 
 class MyApp extends StatelessWidget {
@@ -99,6 +128,7 @@ class MyApp extends StatelessWidget {
         '/upisTimovaSezone':(context)=> const UpisTeamSezona(),
 
 
+
           '/profile': (context) {
           final uid = ModalRoute.of(context)!.settings.arguments as String;
           return UserProfileScreen(uid: uid);
@@ -130,27 +160,40 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+    print("Splash init");
   }
 
   Future<void> _checkLoginStatus() async {
+    print("Checking login...");
+
     await Future.delayed(const Duration(seconds: 2));
+
     final user = FirebaseAuth.instance.currentUser;
 
+    print("Current user object: $user");
+
+    if (!mounted) {
+      print("Widget disposed");
+      return;
+    }
+
     if (user != null) {
+      print("Navigating to HOME");
       Navigator.pushReplacementNamed(context, '/home');
-      print("Current user: ${FirebaseAuth.instance.currentUser?.email}");
     } else {
+      print("Navigating to LOGIN");
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
-
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    print("Splash build");
+
+    return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Image(
-          image: AssetImage('assets/images/logo_firme.png'),
+        child: Image.asset(
+          'assets/images/logo_firme.png',
           width: 200,
         ),
       ),
