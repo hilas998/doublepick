@@ -125,24 +125,6 @@ class _MyLeaguesScreenState extends State<MyLeaguesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF00150A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF00150A),
-        centerTitle: true,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'DoublePick',
-          style: TextStyle(
-            color: Color(0xFFEFFF8A),
-            fontWeight: FontWeight.w900,
-            fontSize: 24,
-            letterSpacing: 1,
-          ),
-        ),
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

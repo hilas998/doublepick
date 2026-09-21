@@ -28,7 +28,6 @@ class AdminScreen extends StatelessWidget {
   Future<void> _calculateRound(BuildContext context) async {
     final db = FirebaseFirestore.instance;
 
-    // 🔹 Učitaj aktivno kolo
     final roundDoc = await db.collection('timovi').doc('aktivni').get();
     if (!roundDoc.exists) return;
 
@@ -52,7 +51,6 @@ class AdminScreen extends StatelessWidget {
     final r3 = int.parse(rez[2].toString());
     final r4 = int.parse(rez[3].toString());
 
-    // 🔹 Dohvati broj kola
     final metaRef = db.collection('meta').doc('config');
     final metaSnap = await metaRef.get();
     int roundNumber = (metaSnap.data()?['currentRound'] ?? 0) + 1;
@@ -68,13 +66,13 @@ class AdminScreen extends StatelessWidget {
       String t3 = d['tip3']?.toString() ?? "";
       String t4 = d['tip4']?.toString() ?? "";
 
-      int m1 = 0;
-      int m2 = 0;
-
       int tip1 = t1.isNotEmpty ? int.parse(t1) : -1;
       int tip2 = t2.isNotEmpty ? int.parse(t2) : -1;
       int tip3 = t3.isNotEmpty ? int.parse(t3) : -1;
       int tip4 = t4.isNotEmpty ? int.parse(t4) : -1;
+
+      int m1 = 0;
+      int m2 = 0;
 
       if ([tip1, tip2, tip3, tip4].every((e) => e != -1)) {
         bool exact1 = tip1 == r1 && tip2 == r2;
@@ -90,46 +88,47 @@ class AdminScreen extends StatelessWidget {
       int total = m1 + m2;
       if (m1 == 20 && m2 == 20) total += 20;
 
-      // 🔹 Update global score
       int global = int.tryParse(d['score'] ?? '0') ?? 0;
       await doc.reference.update({
         'score': (global + total).toString(),
       });
 
+      await doc.reference.collection('rounds').doc('round_$roundNumber').set({
+        'roundNumber': roundNumber,
+        'timovi': {
+          'team1': r['team1'] ?? '',
+          'team2': r['team2'] ?? '',
+          'team3': r['team3'] ?? '',
+          'team4': r['team4'] ?? '',
+        },
+        'stvarniRezultati': {'r1': r1, 'r2': r2, 'r3': r3, 'r4': r4},
+        'userTips': {'tip1': tip1, 'tip2': tip2, 'tip3': tip3, 'tip4': tip4},
+        'points': {'m1': m1, 'm2': m2, 'total': total},
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Dodaj korisnika u standings
       standings.add({
         'uid': doc.id,
-        'ime': d['ime'],
-        'prezime': d['prezime'],
-        'm1': m1,
-        'm2': m2,
+        'ime': d['ime'] ?? '',
+        'prezime': d['prezime'] ?? '',
         'total': total,
-        'tip1': t1,
-        'tip2': t2,
-        'tip3': t3,
-        'tip4': t4,
       });
     }
 
+    // 🔹 Sortiraj i snimi globalno tek nakon što se svi obrade
     standings.sort((a, b) => b['total'].compareTo(a['total']));
 
-    // 🔹 Snimi kolo sa stvarnim rezultatima
     await db.collection('rounds').doc('round_$roundNumber').set({
       'roundNumber': roundNumber,
       'createdAt': FieldValue.serverTimestamp(),
-      'stvarniRezultati': {
-        'r1': r1,
-        'r2': r2,
-        'r3': r3,
-        'r4': r4,
-      },
+      'stvarniRezultati': {'r1': r1, 'r2': r2, 'r3': r3, 'r4': r4},
       'timovi': {
         'team1': r['team1'] ?? '',
         'team2': r['team2'] ?? '',
         'team3': r['team3'] ?? '',
         'team4': r['team4'] ?? '',
-
-
-    },
+      },
       'users': standings,
     });
 
@@ -139,8 +138,6 @@ class AdminScreen extends StatelessWidget {
       SnackBar(content: Text("Round $roundNumber spremljen!")),
     );
   }
-
-
 
   bool _sameOutcome(int a, int b, int x, int y) {
     // Računa rezultat: da li je ishod isti

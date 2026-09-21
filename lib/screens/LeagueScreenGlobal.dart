@@ -322,7 +322,6 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
     print("League ${widget.leagueName} standings saved!");
   }
 
-
   Future<void> _calculateRound(BuildContext context) async {
     final db = FirebaseFirestore.instance;
     final leagueKey = widget.leagueName.toLowerCase().replaceAll(' ', '');
@@ -353,58 +352,66 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
       final unsentColRef = doc.reference.collection(unsentColName);
       final tipColRef = doc.reference.collection(tipColName);
 
-
       // --- Odredi broj runde ---
       final existingRounds = await tipColRef.get();
-      final roundNumber = existingRounds.docs.length + 1; // npr. round1, round2 ...
+      final roundNumber = existingRounds.docs.length + 1;
       final roundDocId = 'round$roundNumber';
 
-      // --- Uzmi korisničke tipove iz unsent collection ---
+      // --- Uzmi korisničke tipove ---
       final unsentDocSnap = await unsentColRef.doc('round1').get();
-      if (!unsentDocSnap.exists) continue; // ako korisnik nema tipove, preskoči
+      if (!unsentDocSnap.exists) continue;
 
       final unsentData = Map<String, dynamic>.from(unsentDocSnap.data()?['matches'] ?? {});
 
-      // --- Kreiraj mapu za novu rundu ---
       final Map<String, dynamic> newRoundData = {};
-
       int roundScore = 0;
 
       for (var match in realMatches) {
         final matchId = match['matchId'];
-
-        // Uzmi postojeći tip korisnika ako postoji
-       // final tipDocSnap = await tipColRef.doc('round1').get(); // možemo uvijek gledati runde od 1
-       // final oldTip = tipDocSnap.exists
-        //    ? Map<String, dynamic>.from(tipDocSnap.data()![matchId] ?? {})
-        //    : {};
-
         final tip = Map<String, dynamic>.from(unsentData[matchId] ?? {});
 
         final hT = tip['tipHome'] ?? -1;
         final aT = tip['tipAway'] ?? -1;
-
         final hR = match['resHome'];
         final aR = match['resAway'];
 
+        int matchPoints = 0;
+
         if (hT != -1 && aT != -1 && hR != -1 && aR != -1) {
-          if (hT == hR && aT == aR) roundScore += 10;
-          else if (_sameOutcome(hT, aT, hR, aR)) roundScore += 2;
+          if (hT == hR && aT == aR) {
+            matchPoints = 10;
+          } else if (_sameOutcome(hT, aT, hR, aR)) {
+            matchPoints = 2;
+          }
         }
 
-        // Dodajemo sve u novi dokument
+        // ✅ saberi bodove samo jednom
+        roundScore += matchPoints;
+
         newRoundData[matchId] = {
-          'home': hT,
-          'away': aT,
+          'tipHome': hT,
+          'tipAway': aT,
           'resHome': hR,
           'resAway': aR,
           'homeTeam': match['homeTeam'],
           'awayTeam': match['awayTeam'],
+          'points': matchPoints, // bodovi po meču
         };
       }
 
-      // --- Spremi novu rundu ---
+      // --- Spremi novu rundu u ligu ---
       await tipColRef.doc(roundDocId).set(newRoundData);
+
+      // --- Spremi i u podkolekciju kod korisnika ---
+      await doc.reference
+          .collection('${leagueKey}rounds')
+          .doc(roundDocId)
+          .set({
+        'roundNumber': roundNumber,
+        'matches': newRoundData,
+        'points': roundScore, // ukupni bodovi
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
       // --- Update globalnog score ---
       int global = 0;
@@ -426,6 +433,7 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
 
     await _saveLeagueStandings();
   }
+
 
 
   bool _sameOutcome(int a, int b, int x, int y) {
@@ -737,6 +745,78 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
                         ),
                       ),
                     ),
+
+                  const SizedBox(height: 24),
+                  const Text("LAST ROUND",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.yellow)),
+
+                  FutureBuilder<QuerySnapshot>(
+                    future: _firestore
+                        .collection('users')
+                        .doc(user!.uid)
+                        .collection('${leagueKey}rounds')
+                        .orderBy('roundNumber', descending: true)
+                        .limit(1)
+                        .get(),
+                    builder: (context, snap) {
+                      if (!snap.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snap.data!.docs.isEmpty) {
+                        return const Text("No last round data", style: TextStyle(color: Colors.grey));
+                      }
+
+                      final data = snap.data!.docs.first.data() as Map<String, dynamic>;
+                      final matches = Map<String, dynamic>.from(data['matches'] ?? {});
+                      final points = data['points'] ?? 0;
+
+                      return Column(
+                        children: [
+                          ...matches.entries.map((e) {
+                            final m = Map<String, dynamic>.from(e.value);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 15),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.greenAccent.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(child: Text(m['homeTeam'], style: const TextStyle(fontWeight: FontWeight.w700))),
+                                      Text("${m['resHome']} : ${m['resAway']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      Expanded(child: Text(m['awayTeam'], textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "Your tip: ${m['tipHome']} : ${m['tipAway']}  → Points: ${m['points']}",
+                                    style: const TextStyle(color: Colors.black87),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 10),
+                          Text(
+                            "Total points: $points",
+                            style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
 
                   if (_isAdmin(user))
                     Padding(

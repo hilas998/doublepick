@@ -113,11 +113,11 @@ class _HomeScreenState extends State<HomeScreen>
 
 
 
-   
+
 
 
     WidgetsBinding.instance.addObserver(this);
-   // MobileAds.instance.initialize();
+    // MobileAds.instance.initialize();
 
     requestNotificationPermission();
     tz.initializeTimeZones();
@@ -1110,6 +1110,14 @@ class _HomeScreenState extends State<HomeScreen>
 
                       const SizedBox(height: 40),
 
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/menuScreen');
+                        },
+                        child: const Text("Open Menu"),
+                      ),
+
+
                       const SizedBox(height: 20), // padding na kraj scrolla
                     ],
                   ),
@@ -1460,46 +1468,46 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               )
 
-    else
-    Container(
-    width: 140, // malo manja širina da ne zauzima cijeli red
-    height: 50,
-    decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(18),
-    gradient: const LinearGradient(
-    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
-    ),
-    boxShadow: [
-    BoxShadow(
-    color: const Color(0xFF22E58B).withOpacity(0.45),
-    blurRadius: 16,
-    spreadRadius: 1,
-    offset: const Offset(0, 6),
-    ),
-    ],
-    ),
-    child: Container(
-    margin: const EdgeInsets.all(2.2),
-    decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(16),
-    color: Colors.white.withOpacity(0.85),
-    ),
-    child: Center(
-    child: Text(
-    "Your pick: " +
-    ((homeCtrl.text.isEmpty && awayCtrl.text.isEmpty)
-    ? "No results"
-        : "${homeCtrl.text}-${awayCtrl.text}"),
-    style: const TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w900,
-    color: Color(0xFF00150A),
-    ),
-    textAlign: TextAlign.center,
-    ),
-    ),
-    ),
-    ),
+            else
+              Container(
+                width: 140, // malo manja širina da ne zauzima cijeli red
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF22E58B).withOpacity(0.45),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(2.2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withOpacity(0.85),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "Your pick: " +
+                          ((homeCtrl.text.isEmpty && awayCtrl.text.isEmpty)
+                              ? "No results"
+                              : "${homeCtrl.text}-${awayCtrl.text}"),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF00150A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
 
 
 
@@ -1516,61 +1524,61 @@ class _HomeScreenState extends State<HomeScreen>
       child: Container(
         height: 58,
         decoration: BoxDecoration(
-     borderRadius: BorderRadius.circular(18),
-gradient: const LinearGradient(
-colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
-),
-boxShadow: [
-BoxShadow(
-color: const Color(0xFF22E58B).withOpacity(0.45),
-blurRadius: 16,
-spreadRadius: 1,
-offset: const Offset(0, 6),
-),
-],
-),
-child: Container(
-margin: const EdgeInsets.all(2.2), // okvir efekat
-decoration: BoxDecoration(
-borderRadius: BorderRadius.circular(16),
-color: Colors.white,
-),
-child: TextField(
-controller: ctrl,
-maxLength: 1, // ✅ SAMO JEDNA CIFRA
-keyboardType: TextInputType.number,
-inputFormatters: [
-FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
-],
-textAlign: TextAlign.center,
-style: const TextStyle(
-fontSize: 22,
-fontWeight: FontWeight.w900,
-color: Color(0xFF00150A),
-),
-decoration: const InputDecoration(
-counterText: "",
-hintText: "enter score",
-hintStyle: TextStyle(
-fontWeight: FontWeight.w800,
-color: Color(0xFF22E58B),
-letterSpacing: 1,
-),
-border: InputBorder.none,
-),
-),
-),
-),
-);
-}
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF22E58B).withOpacity(0.45),
+              blurRadius: 16,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(2.2), // okvir efekat
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+          ),
+          child: TextField(
+            controller: ctrl,
+            maxLength: 1, // ✅ SAMO JEDNA CIFRA
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
+            ],
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF00150A),
+            ),
+            decoration: const InputDecoration(
+              counterText: "",
+              hintText: "enter score",
+              hintStyle: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF22E58B),
+                letterSpacing: 1,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
 
 
 
-void _logout() async {
-await FirebaseAuth.instance.signOut();
-if (mounted) Navigator.pushReplacementNamed(context, '/login');
-}
+  void _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) Navigator.pushReplacementNamed(context, '/login');
+  }
 
 
 

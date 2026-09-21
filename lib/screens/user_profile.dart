@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String uid;
@@ -20,16 +23,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   List<String> leagueRounds = [];
   Map<String, dynamic>? leagueRoundData;
 
-
+  String inviteCode = "";
 
   @override
   void initState() {
     super.initState();
     _loadRounds();
+    _loadInviteCode();
 
   }
 
 
+  Future<void> _loadInviteCode() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (doc.exists) {
+      setState(() {
+        inviteCode = doc['inviteCode'] ?? user.uid.substring(0, 6);
+      });
+    }
+  }
+
+  void _shareReferral() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final link =
+        "https://play.google.com/store/apps/details?id=com.doublepick&referrer=${user.uid}";
+    await Share.share("🎯 Join DoublePick and earn points!\n$link");
+  }
   Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
     final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
     setState(() {
@@ -46,6 +68,76 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+
+
+  Future<void> _logout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Logout failed")),
+      );
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete account"),
+        content: const Text(
+          "This will permanently delete your account and score. Continue?",
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final uid = user.uid;
+
+      // obriši Firestore podatke
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+
+      // obriši auth nalog
+      await user.delete();
+
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Re-login required before deleting account")),
+      );
+    }
+  }
+
+  void _copyInviteCode() {
+    if (inviteCode.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: inviteCode));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Invite code copied!")),
+    );
+  }
+
+  void _sendInviteCode() async {
+    if (inviteCode.isEmpty) return;
+    final message = "🎯 Join DoublePick! Use my invite code: $inviteCode";
+    await Share.share(message);
+  }
 
   Future<void> _loadLeagueRounds(String leagueKey) async {
     final snap = await FirebaseFirestore.instance
@@ -72,6 +164,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (selectedLeagueRound != null) {
       await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
     }
+  }
+  String _formatLeagueName(String key) {
+    // razdvoji po "_" i uzmi prvu riječ
+    final parts = key.split("_");
+    if (parts.isEmpty) return key;
+
+    // kapitaliziraj prvu riječ
+    final first = parts.first;
+    return first[0].toUpperCase() + first.substring(1).toLowerCase();
   }
 
 
@@ -114,6 +215,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
 
+
+
   Future<void> _loadRounds() async {
     final db = FirebaseFirestore.instance;
     final roundsSnap = await db.collection('rounds').orderBy('roundNumber').get();
@@ -143,12 +246,59 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       'stvarniRezultati': round['stvarniRezultati'],
       'userData': userData,
     };
+
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF00150A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF011F0A),
+        centerTitle: true,
+        elevation: 0,
+        title: const Text(
+          'DoublePick',
+          style: TextStyle(
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
+          ),
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'logout') {
+                _logout();
+              } else if (value == 'delete') {
+                _deleteAccount();
+              } else if (value == 'reset') {
+                Navigator.pushNamed(context, '/reset'); // otvara reset screen
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text("Log out"),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text("Delete Profile"),
+              ),
+              const PopupMenuItem(
+                value: 'reset',
+                child: Text(
+                  "Reset password",
+                  style: TextStyle(color: Colors.red), // crveni tekst
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+
       body: FutureBuilder<Map<String, dynamic>?>(
         future: _getUser(),
         builder: (context, snap) {
@@ -176,22 +326,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             child: Column(
               children: [
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96), size: 26),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      "DoublePick",
-                      style: TextStyle(fontSize: 26, color: Color(0xFFEFFF8A), fontWeight: FontWeight.bold),
-                    ),
-                    const Spacer(),
-                    const SizedBox(width: 48),
-                  ],
-                ),
                 const SizedBox(height: 16),
                 Expanded(
                   child: SingleChildScrollView(
@@ -304,6 +438,70 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                 const SizedBox(height: 16),
                 _divider(),
+                // 🔹 Novi dio: Invite + Share
+                const SizedBox(height: 12),
+                Text("Invite Code: $inviteCode",
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black)),
+                const SizedBox(height: 10),
+
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _copyInviteCode,
+                      icon: const Icon(Icons.copy),
+                      label: const Text("Copy"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _sendInviteCode,
+                      icon: const Icon(Icons.send),
+                      label: const Text("Send"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+
+
+
+                Column(
+                  children: [
+
+                    // 👇 Admin panel samo za određenog korisnika
+                    if ((FirebaseAuth.instance.currentUser?.email ?? "") == "salihlihic998@gmail.com")
+                      _menuTile(
+                        context,
+                        "Admin panel",
+                        Icons.admin_panel_settings,
+                        '/admin',
+                        danger: true,
+                        textColor: Colors.red,
+                      ),
+                  ],
+                ),
+
+                ElevatedButton.icon(
+                  onPressed: _shareReferral,
+                  icon: const Icon(Icons.share),
+                  label: const Text("Share App"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade400,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+                _divider(),
 
                 const SizedBox(height: 12),
                 const Text(
@@ -322,11 +520,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 const SizedBox(height: 12),
               ],
             ),
+
           ),
         ),
       ),
     );
   }
+
+  Widget _menuTile(BuildContext context, String text, IconData icon, String route,
+      {bool danger = false, Color textColor = Colors.white}) {
+    return ListTile(
+      leading: Icon(icon, color: danger ? Colors.red : Colors.greenAccent),
+      title: Text(
+        text,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: () {
+        Navigator.pushNamed(context, route);
+      },
+    );
+  }
+
 
   Widget _matchCard(String matchTitle, dynamic home, dynamic away) {
     return Container(
@@ -428,10 +645,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           items: userLeagues.map((l) {
             return DropdownMenuItem(
               value: l,
-              child: Text(l.toUpperCase(), style: const TextStyle(color: Colors.yellow)),
+              child: Text(
+                _formatLeagueName(l),
+                style: const TextStyle(color: Colors.yellow),
+              ),
             );
           }).toList(),
         ),
+
+
 
         const SizedBox(height: 10),
 
@@ -707,3 +929,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
 
 }
+
+
+

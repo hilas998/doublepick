@@ -19,10 +19,28 @@ import 'screens/AdminLeague.dart';
 import 'screens/LeagueDetail.dart';
 import 'screens/MyLeagues.dart';
 import 'screens/BonusGameScreenAdmin.dart';
-import 'screens/LeagueScreenGlobal.dart';
 import 'screens/LaguesGameScreenAdmin.dart';
 import 'screens/Teamupisadmin.dart';
 import 'screens/UpisTeamSezona.dart';
+
+
+
+import 'screens/menu_screen.dart';
+import 'screens/leaderboard_screen.dart';
+import 'screens/league_menu_screen.dart';
+import 'screens/bonus_game_menu_screen.dart';
+import 'screens/my_leagues_favorites_screen.dart';
+import 'screens/profile_trazenog_korisnika.dart';
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -39,9 +57,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  print("========== APP START ==========");
 
-  print("1 - Widgets initialized");
   // 🔹 Registracija background handlera
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -52,33 +68,6 @@ void main() async {
   RemoteMessage? initialMessage = await messaging.getInitialMessage();
 
   runApp(MyApp(initialMessage: initialMessage));
-
-
-
-  try {
-    await Firebase.initializeApp();
-    print("2 - Firebase initialized");
-  } catch (e, s) {
-    print("FIREBASE ERROR:");
-    print(e);
-    print(s);
-    rethrow;
-  }
-
-  FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler);
-  print("3 - Background handler registered");
-
-  try {
-    await MobileAds.instance.initialize();
-    print("4 - Mobile Ads initialized");
-  } catch (e, s) {
-    print("ADMOB ERROR:");
-    print(e);
-    print(s);
-  }
-
-
 }
 
 class MyApp extends StatelessWidget {
@@ -92,13 +81,13 @@ class MyApp extends StatelessWidget {
     if (initialMessage != null) {
       // mora delay jer navigatorKey nije odmah spreman
       Future.delayed(const Duration(milliseconds: 300), () {
-        navigatorKey.currentState?.pushNamed('/home');
+        navigatorKey.currentState?.pushNamed('/menuScreen');
       });
     }
 
     // 🔹 Listener kad je app u pozadini pa se klikne na notifikaciju
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      navigatorKey.currentState?.pushNamed('/home');
+      navigatorKey.currentState?.pushNamed('/menuScreen');
     });
 
     return MaterialApp(
@@ -127,15 +116,27 @@ class MyApp extends StatelessWidget {
         '/leaguesAdminTeam':(context)=> const Teamupisadmin(),
         '/upisTimovaSezone':(context)=> const UpisTeamSezona(),
 
+        '/menuScreen': (context) => const MenuScreen(),
+        '/leaderboard': (context) => const LeaderboardScreen(),
+        '/leagueMenu': (context) => const LeagueMenuScreen(),
+        '/bonusGameMenu': (context) => const BonusGameMenuScreen(),
+        '/myLeaguesFavorites': (context) => const MyLeaguesFavoritesScreen(),
 
 
-          '/profile': (context) {
+
+
+        '/profileTrazenogKorisnika': (context) {
+          final uid = ModalRoute.of(context)!.settings.arguments as String;
+          return ProfileTrazenogKorisnikaScreen(uid: uid);
+        },
+
+        '/profile': (context) {
           final uid = ModalRoute.of(context)!.settings.arguments as String;
           return UserProfileScreen(uid: uid);
+        },
 
-    },
 
-             '/invite_code': (context) {
+        '/invite_code': (context) {
     return const Scaffold(
     body: Center(child: Text("Invalid route")),
              );
@@ -146,6 +147,8 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+
 
 // 🔹 Splash ekran
 class SplashScreen extends StatefulWidget {
@@ -160,41 +163,28 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _checkLoginStatus();
-    print("Splash init");
   }
 
   Future<void> _checkLoginStatus() async {
-    print("Checking login...");
-
     await Future.delayed(const Duration(seconds: 2));
-
     final user = FirebaseAuth.instance.currentUser;
 
-    print("Current user object: $user");
-
-    if (!mounted) {
-      print("Widget disposed");
-      return;
-    }
-
     if (user != null) {
-      print("Navigating to HOME");
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/menuScreen');
+      print("Current user: ${FirebaseAuth.instance.currentUser?.email}");
     } else {
-      print("Navigating to LOGIN");
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    print("Splash build");
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: const Center(
-        child: Text(
-          "LOADING",
-          style: TextStyle(fontSize: 30, color: Colors.black),
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Image(
+          image: AssetImage('assets/images/logo_firme.png'),
+          width: 200,
         ),
       ),
     );

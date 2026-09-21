@@ -188,7 +188,7 @@ class _LeagueLeaderboardScreenState extends State<LeagueLeaderboardScreen> {
     onTap: () {
     Navigator.pushNamed(
     context,
-    '/profile',
+      '/profileTrazenogKorisnika',
     arguments: user['uid'],
     );
     },

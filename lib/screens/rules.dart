@@ -46,10 +46,6 @@ class _RulesScreenState extends State<RulesScreen> {
         backgroundColor: const Color(0xFF011F0A),
         centerTitle: true,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'DoublePick',
           style: TextStyle(
@@ -59,6 +55,7 @@ class _RulesScreenState extends State<RulesScreen> {
             letterSpacing: 1,
           ),
         ),
+
       ),
       body: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),

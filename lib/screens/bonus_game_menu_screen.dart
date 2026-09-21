@@ -1,0 +1,1232 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+import 'package:flutter/services.dart';
+
+
+
+
+
+
+
+
+
+class BonusGameMenuScreen extends StatefulWidget {
+  const BonusGameMenuScreen({super.key});
+
+  @override
+  State<BonusGameMenuScreen> createState() => _BonusGameMenuScreenState();
+}
+
+class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const platform = MethodChannel('app.settings.channel');
+
+
+  String name = '', surname = '', email = '', score = '0';
+  String team1 = '', team2 = '', team3 = '', team4 = '';
+  String rez1 = '', rez2 = '', rez3 = '', rez4 = '';
+  bool hasSubmitted = false;
+
+  final tip1Ctrl = TextEditingController();
+  final tip2Ctrl = TextEditingController();
+  final tip3Ctrl = TextEditingController();
+  final tip4Ctrl = TextEditingController();
+
+  int startTime = 0, globalEndTime = 0, scoreCalcEndTime = 0;
+  Duration remaining = Duration.zero;
+  Timer? timer;
+  String phaseText = '';
+
+  BannerAd? _bannerAd;
+
+  RewardedAd? _rewardedAd;
+
+  bool rewardGranted = false;
+
+
+
+  String inviteCode = '';
+  bool _canWatchAd = false;
+  int _nextAdTime = 0;
+  String _adCountdownText = "";
+  Timer? _countdownTimer;
+
+
+  List<Map<String, dynamic>> lastRoundMatches = [];
+
+
+  bool _adConsumedThisSession = false;
+  InterstitialAd? _interstitialAd;
+
+
+
+
+  // 🔔 Lokalna obavijest (za Ad cooldown)
+  final FlutterLocalNotificationsPlugin _localNoti =
+  FlutterLocalNotificationsPlugin();
+
+
+  late StreamSubscription<List<ConnectivityResult>> _connSub;
+  StreamSubscription<DocumentSnapshot>? _roundSub;
+
+  bool _roundHandledForThisCycle = false;
+  late AnimationController _animController;
+  late AnimationController _pulseController;
+
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _pulseAnim;
+
+
+
+
+
+
+
+  @override
+  void initState() {
+    super.initState();
+
+
+
+
+
+
+
+    WidgetsBinding.instance.addObserver(this);
+    // MobileAds.instance.initialize();
+
+    requestNotificationPermission();
+    tz.initializeTimeZones();
+    _initializeLocalNotifications();
+    _loadUser();
+    _loadMatchAndTimer();
+    _loadBanner();
+    _loadRewarded();
+    _checkAdAvailability();
+    _loadInterstitialAd();
+    _loadLastRound();
+
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _pulseAnim = Tween<double>(begin: 1, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _animController.forward();
+
+    if (_rewardedAd == null) {
+      _loadRewarded();
+      return;
+    }
+
+
+
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    _connSub.cancel();
+    _bannerAd?.dispose();
+    _rewardedAd?.dispose();
+    _roundSub?.cancel();
+    timer?.cancel();
+    _countdownTimer?.cancel();
+
+    _interstitialAd?.dispose();
+
+
+    for (var c in [tip1Ctrl, tip2Ctrl, tip3Ctrl, tip4Ctrl]) {
+      c.dispose();
+    }
+
+
+    _animController.dispose();
+    _pulseController.dispose();
+
+    super.dispose();
+
+  }
+
+
+
+
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAdAvailability();
+
+      // 🔥 FORCE reload banner
+      _bannerAd?.dispose();
+      _bannerAd = null;
+      _loadBanner();
+
+
+
+      // 🔥 ako rewarded ne postoji – učitaj
+      if (_rewardedAd == null && _canWatchAd) {
+        _loadRewarded();
+      }
+    }
+  }
+
+
+  // 🔹 Učitavanje korisnika i tipova
+  Future<void> _loadUser() async {
+    final u = _auth.currentUser;
+    if (u == null) return;
+    final doc = await _firestore.collection('users').doc(u.uid).get();
+    if (doc.exists) {
+      setState(() {
+        name = doc['ime'] ?? '';
+        surname = doc['prezime'] ?? '';
+        email = u.email ?? '';
+        score = doc['score'] ?? '0';
+        _adConsumedThisSession = false;
+
+
+        inviteCode = doc['inviteCode'] ?? _auth.currentUser!.uid.substring(0, 6);
+        hasSubmitted = doc.data()?['tip1'] != null &&
+            doc.data()?['tip2'] != null &&
+            doc.data()?['tip3'] != null &&
+            doc.data()?['tip4'] != null;
+
+
+
+        tip1Ctrl.text = doc.data()?['tip1']?.toString() ?? '';
+        tip2Ctrl.text = doc.data()?['tip2']?.toString() ?? '';
+        tip3Ctrl.text = doc.data()?['tip3']?.toString() ?? '';
+        tip4Ctrl.text = doc.data()?['tip4']?.toString() ?? '';
+
+
+
+
+
+
+        final now = DateTime.now().millisecondsSinceEpoch;
+        _nextAdTime = doc.data()?['nextAdTime'] ?? 0;
+        _canWatchAd = now >= _nextAdTime;
+
+
+
+        if (!_canWatchAd && _nextAdTime > 0) {
+          _startCountdown();
+        }
+
+      });
+
+
+    }
+  }
+
+  // 🔹 Učitavanje utakmica i tajmera
+  Future<void> _loadMatchAndTimer() async {
+    final ref = _firestore.collection('timovi').doc('aktivni');
+    final doc = await ref.get();
+    if (!doc.exists) return;
+
+    setState(() {
+      team1 = doc['team1'] ?? '';
+      team2 = doc['team2'] ?? '';
+      team3 = doc['team3'] ?? '';
+      team4 = doc['team4'] ?? '';
+      rez1 = doc['stvarnirezultat1'] ?? '';
+      rez2 = doc['stvarnirezultat2'] ?? '';
+      rez3 = doc['stvarnirezultat3'] ?? '';
+      rez4 = doc['stvarnirezultat4'] ?? '';
+      startTime = (doc['startTimeMillis'] ?? 0).toInt();
+      globalEndTime = (doc['globalEndTimeMillis'] ?? 0).toInt();
+      scoreCalcEndTime = (doc['scoreCalcEndTimeMillis'] ?? 0).toInt();
+      _roundHandledForThisCycle = false;
+    });
+
+    _updatePhase();
+    _startTimer();
+
+    // 🔹 Listener za promjene (automatski refresh)
+    _roundSub?.cancel();
+    _roundSub = ref.snapshots().listen((snap) async {
+      if (!snap.exists) return;
+      final data = snap.data() as Map<String, dynamic>?;
+
+      setState(() {
+        rez1 = (data?['stvarnirezultat1'] ?? '') as String;
+        rez2 = (data?['stvarnirezultat2'] ?? '') as String;
+        rez3 = (data?['stvarnirezultat3'] ?? '') as String;
+        rez4 = (data?['stvarnirezultat4'] ?? '') as String;
+        startTime = (data?['startTimeMillis'] ?? startTime).toInt();
+        globalEndTime = (data?['globalEndTimeMillis'] ?? globalEndTime).toInt();
+        scoreCalcEndTime =
+            (data?['scoreCalcEndTimeMillis'] ?? scoreCalcEndTime).toInt();
+      });
+
+
+      _updatePhase();
+
+      if (data?['startTimeMillis'] != null) {
+        _loadUser();
+        setState(() {
+          hasSubmitted = false;
+          tip1Ctrl.clear();
+          tip2Ctrl.clear();
+          tip3Ctrl.clear();
+          tip4Ctrl.clear();
+        });
+      }
+    });
+  }
+
+
+  Future<void> _loadLastRound() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    // uzmi zadnji dokument iz users/{uid}/rounds
+    final snap = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('rounds')
+        .orderBy('roundNumber', descending: true)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return;
+
+    final data = snap.docs.first.data();
+
+    final timovi = (data['timovi'] != null)
+        ? Map<String, dynamic>.from(data['timovi'])
+        : {};
+
+    final rezultati = (data['stvarniRezultati'] != null)
+        ? Map<String, dynamic>.from(data['stvarniRezultati'])
+        : {};
+
+    final userTips = (data['userTips'] != null)
+        ? Map<String, dynamic>.from(data['userTips'])
+        : {};
+
+    final points = (data['points'] != null)
+        ? Map<String, dynamic>.from(data['points'])
+        : {};
+
+    setState(() {
+      lastRoundMatches = [
+        {
+          'homeTeam': timovi['team1'] ?? '',
+          'awayTeam': timovi['team2'] ?? '',
+          'resHome': rezultati['r1'] ?? '',
+          'resAway': rezultati['r2'] ?? '',
+          'tipHome': userTips['tip1'] ?? '',
+          'tipAway': userTips['tip2'] ?? '',
+          'points': points['m1'] ?? 0,
+        },
+        {
+          'homeTeam': timovi['team3'] ?? '',
+          'awayTeam': timovi['team4'] ?? '',
+          'resHome': rezultati['r3'] ?? '',
+          'resAway': rezultati['r4'] ?? '',
+          'tipHome': userTips['tip3'] ?? '',
+          'tipAway': userTips['tip4'] ?? '',
+          'points': points['m2'] ?? 0,
+        },
+      ];
+    });
+
+  }
+
+  void _startTimer() {
+    if (startTime <= 0 || globalEndTime <= 0 || scoreCalcEndTime <= 0) {
+      Future.delayed(const Duration(milliseconds: 300), _startTimer);
+      return;
+    }
+    timer?.cancel();
+    timer = Timer.periodic(const Duration(seconds: 1), (_) => _updatePhase());
+  }
+
+  // 🔹 Glavna fazna logika
+  void _updatePhase() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    String newPhase;
+    int targetTime;
+
+    if (now < startTime) {
+      newPhase = "Round starts in";
+      targetTime = startTime;
+    } else if (now < globalEndTime) {
+      newPhase = "Enrollment time left";
+      targetTime = globalEndTime;
+    } else if (now < scoreCalcEndTime) {
+      newPhase = "Results coming in";
+      targetTime = scoreCalcEndTime;
+
+
+
+      // ✅ kopiranje kad završi Results coming in
+      if (!_roundHandledForThisCycle && now >= scoreCalcEndTime - 1000) {
+        _roundHandledForThisCycle = true;
+
+      }
+    } else {
+      newPhase = "Round over";
+      targetTime = now;
+    }
+
+    final diff =
+    Duration(milliseconds: (targetTime - now).clamp(0, 999999999));
+    setState(() {
+      phaseText = newPhase;
+      remaining = diff;
+    });
+  }
+
+
+
+
+  Future<void> _checkAdAvailability() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (!doc.exists) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final nextAdTime = doc.data()?['nextAdTime'] ?? 0;
+
+
+
+
+
+    setState(() {
+      _nextAdTime = nextAdTime;
+      _canWatchAd = now >= nextAdTime;
+
+      if (_canWatchAd) {
+        _adConsumedThisSession = false; // 🔥 KRITIČNO
+        _adCountdownText = "";
+      } else {
+        _startCountdown();
+      }
+    });
+
+    if (_canWatchAd && _rewardedAd == null) {
+      _loadRewarded();
+    }
+
+
+  }
+
+  void _loadRewarded() {
+    RewardedAd.load(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/2944332927'
+          : 'ca-app-pub-6791458589312613/7308197301',
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          setState(() {});
+        },
+        onAdFailedToLoad: (error) {
+          _rewardedAd = null;
+        },
+      ),
+    );
+  }
+
+  void _showRewarded() {
+    if (_rewardedAd == null) return;
+    if (_adConsumedThisSession) return;
+
+    rewardGranted = false;
+    _adConsumedThisSession = true;
+
+    if (_rewardedAd == null) {
+      print("❌ Rewarded ad not ready");
+      return;
+    }
+
+    setState(() {
+      _canWatchAd = false;
+      _adCountdownText = "";
+    });
+
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+
+        _rewardedAd = null;
+        if (!rewardGranted) {
+          _adConsumedThisSession = false; // 🔥 VRATI
+        }
+        _loadRewarded();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAd = null;
+        _loadRewarded();
+        _adConsumedThisSession = false;
+      },
+    );
+
+    _rewardedAd!.show(
+      onUserEarnedReward: (_, __) async {
+        rewardGranted = true;
+        await _addPoints(2);
+        await _startAdCooldown();
+      },
+    );
+
+
+  }
+
+  void _loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/6040084377' // STAVI SVOJ ID
+          : 'ca-app-pub-6791458589312613/7153855495',
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          _interstitialAd = null;
+        },
+      ),
+    );
+  }
+  void _showInterstitialAd() {
+    if (_interstitialAd == null) return;
+
+    _interstitialAd!.fullScreenContentCallback =
+        FullScreenContentCallback(
+          onAdDismissedFullScreenContent: (ad) {
+            ad.dispose();
+            _interstitialAd = null;
+            _loadInterstitialAd(); // reload
+          },
+          onAdFailedToShowFullScreenContent: (ad, error) {
+            ad.dispose();
+            _interstitialAd = null;
+          },
+        );
+
+    _interstitialAd!.show();
+  }
+
+  void _loadBanner() {
+    _bannerAd = BannerAd(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6791458589312613/3522917422' // ✅ ANDROID BANNER
+          : 'ca-app-pub-6791458589312613/3240411048', // 🔁 iOS banner (moraš iz AdMob-a)
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) => ad.dispose(),
+      ),
+    )..load();
+  }
+  void requestNotificationPermission() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    print('Dozvola: ${settings.authorizationStatus}');
+    if (settings.authorizationStatus == AuthorizationStatus.denied ||
+        settings.authorizationStatus == AuthorizationStatus.provisional) {
+      _showNotificationSettingsDialog();
+    }
+  }
+  Future<void> _showNotificationSettingsDialog() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Enable notifications"),
+        content: const Text(
+          "Notifications are required for updates, reminders and rewards.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await platform.invokeMethod('openNotificationSettings');
+            },
+            child: const Text("Open settings"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Later"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _initializeLocalNotifications() async {
+    const AndroidInitializationSettings android =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings ios = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings settings = InitializationSettings(
+      android: android,
+      iOS: ios,
+    );
+
+    await _localNoti.initialize(settings);
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+  // 🔹 Slanje tipova
+  Future<void> _submitTips() async {
+    if ([tip1Ctrl, tip2Ctrl, tip3Ctrl, tip4Ctrl]
+        .any((c) => c.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fill in all 4 entries')),
+      );
+      return;
+
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now >= globalEndTime) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enrollment period is over')),
+      );
+      return;
+    }
+
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).update({
+      'tip1': tip1Ctrl.text.trim(),
+      'tip2': tip2Ctrl.text.trim(),
+      'tip3': tip3Ctrl.text.trim(),
+      'tip4': tip4Ctrl.text.trim(),
+    });
+    setState(() => hasSubmitted = true);
+
+    if (_interstitialAd != null) {
+      _showInterstitialAd();
+    } else {
+      _loadInterstitialAd(); // učitaj za sljedeći put
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Predictions submitted!')));
+  }
+
+
+  Future<void> _addPoints(int pts) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final ref = _firestore.collection('users').doc(uid);
+    final snap = await ref.get();
+    if (!snap.exists) return;
+    final current = int.tryParse(snap['score'] ?? '0') ?? 0;
+    final newScore = current + pts;
+    await ref.update({'score': newScore.toString()});
+    setState(() => score = newScore.toString());
+  }
+
+  Future<void> _startAdCooldown() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+
+
+    final now = DateTime.now();
+    final next = now.add(const Duration(hours: 12));
+
+    await _firestore.collection('users').doc(uid).update({
+      'nextAdTime': next.millisecondsSinceEpoch,
+    });
+    setState(() {
+      _canWatchAd = false;
+      _nextAdTime = next.millisecondsSinceEpoch;
+    });
+
+    await _scheduleAdAvailableNotification(next);
+    print("🔥 Ad cooldown started. Next ad at: ${next.millisecondsSinceEpoch}");
+  }
+
+  Future<void> _scheduleAdAvailableNotification(DateTime time) async {
+    const androidDetails = AndroidNotificationDetails(
+      'ad_channel',
+      'Ad Notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const details = NotificationDetails(android: androidDetails);
+
+    await _localNoti.zonedSchedule(
+      999, // ID
+      'Ad is available again!',
+      'Watch the ad and earn +2 points.',
+      tz.TZDateTime.from(time, tz.local),
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+      UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: null,
+    );
+  }
+
+
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final diff = _nextAdTime - now;
+
+      if (diff <= 0) {
+        _countdownTimer?.cancel();
+        setState(() {
+          _canWatchAd = true;
+          _adConsumedThisSession = false;
+          _adCountdownText = "";
+        });
+
+        if (_rewardedAd == null) {
+          _loadRewarded();
+        }
+
+
+        return;
+      }
+
+      final duration = Duration(milliseconds: diff);
+      final h = duration.inHours.toString().padLeft(2, '0');
+      final m = (duration.inMinutes % 60).toString().padLeft(2, '0');
+      final s = (duration.inSeconds % 60).toString().padLeft(2, '0');
+
+      setState(() {
+        _adCountdownText = "Next ad reward in $h:$m:$s";
+      });
+    });
+  }
+
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    final h = remaining.inHours;
+    final m = remaining.inMinutes.remainder(60);
+    final s = remaining.inSeconds.remainder(60);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF00150A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF011F0A),
+        centerTitle: true,
+        elevation: 0,
+        title: const Text(
+          'DoublePick',
+          style: TextStyle(
+            color: Color(0xFFEFFF8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
+            letterSpacing: 1,
+          ),
+        ),
+
+      ),
+
+      body: Column(
+        children: [
+
+          // ===== SCROLLABLE CONTENT =====
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // =========================
+                  // PHASE + TIMER (SADA PRVI)
+                  // =========================
+                  Card(
+                    elevation: 4,
+                    shadowColor: const Color(0xFF44FF96).withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF022D12),
+                            Color(0xFF011F0A),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            phaseText.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 1,
+                              color: Color(0xFF44FF96),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "${h.toString().padLeft(2, '0')}:"
+                                "${m.toString().padLeft(2, '0')}:"
+                                "${s.toString().padLeft(2, '0')}",
+                            style: const TextStyle(
+                              color: Color(0xFFEFFF8A),
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // =========================
+                  // MATCH CARDS
+                  // =========================
+                  _matchCard(team1, team2, rez1, rez2, tip1Ctrl, tip2Ctrl),
+                  const SizedBox(height: 8),
+                  _matchCard(team3, team4, rez3, rez4, tip3Ctrl, tip4Ctrl),
+
+                  const SizedBox(height: 16),
+
+                  // =========================
+                  // SEND BUTTON
+                  // =========================
+                  if (!hasSubmitted && phaseText == "Enrollment time left")
+                    Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF44FF96),
+                              Color(0xFFEFFF8A),
+                            ],
+                          ),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _submitTips,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 40, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.send_rounded, color: Colors.black),
+                              SizedBox(width: 10),
+                              Text(
+                                "SEND RESULTS",
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 12),
+
+                  // =========================
+                  // REWARDED BUTTON
+                  // =========================
+                  if (_canWatchAd && _rewardedAd != null)
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _showRewarded,
+                        icon: const Icon(Icons.play_circle_fill),
+                        label: const Text("+2 points"),
+                      ),
+                    )
+                  else if (!_canWatchAd && _adCountdownText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        _adCountdownText,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+
+
+                  const SizedBox(height: 20),
+
+                  // =========================
+                  // HEADER PREBAČEN NA DNO
+                  // =========================
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    tween: Tween(begin: 0, end: 1),
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 24 * (1 - value)),
+                        child: child,
+                      ),
+                    ),
+
+                  ),
+
+                  const SizedBox(height: 20),
+
+
+
+
+                  const Divider(),
+                  const Text("LAST ROUND", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,color: Colors.yellow)),
+
+                  if (lastRoundMatches.isEmpty)
+                    const Text("No last round data", style: TextStyle(color: Colors.grey))
+                  else
+                    Column(
+                      children: lastRoundMatches.map((m) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 15),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.greenAccent.withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: Text(m['homeTeam'], style: const TextStyle(fontWeight: FontWeight.w700))),
+                                  Text("${m['resHome']} : ${m['resAway']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  Expanded(child: Text(m['awayTeam'], textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700))),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text("Your tip: ${m['tipHome']} : ${m['tipAway']}  → Points: ${m['points']}",
+                                  style: const TextStyle(color: Colors.black87)),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                  const SizedBox(height: 24),
+
+
+
+                  // ===== BANNER AD (IZMEĐU GRID I HEADER) =====
+                  if (_bannerAd != null)
+                    Center(
+                      child: SizedBox(
+                        width: _bannerAd!.size.width.toDouble(),
+                        height: _bannerAd!.size.height.toDouble(),
+                        child: AdWidget(ad: _bannerAd!),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+
+
+
+        ],
+      ),
+
+
+
+    );
+  }
+
+
+
+  Widget _matchCard(
+      String homeTeam,
+      String awayTeam,
+      String homeResult,
+      String awayResult,
+      TextEditingController homeCtrl,
+      TextEditingController awayCtrl,
+      ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFB8FF5C), Color(0xFFB8FF5C)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.greenAccent.withOpacity(0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.white.withOpacity(0.85),
+        ),
+        child: Column(
+          children: [
+            // ===== TEAM NAMES + RESULT =====
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    homeTeam, // 🔥 TAČNO KAKO JE U FIREBASE
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                Text(
+                  "$homeResult : $awayResult", // ❌ NEMA KAPSULE
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    awayTeam, // 🔥 TAČNO KAKO JE U FIREBASE
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ===== INPUT SCORE =====
+            if (!hasSubmitted && phaseText == "Enrollment time left")
+              Row(
+                children: [
+                  _scoreInput(homeCtrl),
+                  const SizedBox(width: 14),
+                  _scoreInput(awayCtrl),
+                ],
+              )
+
+            else
+              Container(
+                width: 140, // malo manja širina da ne zauzima cijeli red
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF22E58B).withOpacity(0.45),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(2.2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withOpacity(0.85),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "Your pick: " +
+                          ((homeCtrl.text.isEmpty && awayCtrl.text.isEmpty)
+                              ? "No results"
+                              : "${homeCtrl.text}-${awayCtrl.text}"),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF00150A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+
+
+
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+  Widget _scoreInput(TextEditingController ctrl) {
+    return Expanded(
+      child: Container(
+        height: 58,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF22E58B), Color(0xFFB8FF5C)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF22E58B).withOpacity(0.45),
+              blurRadius: 16,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(2.2), // okvir efekat
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+          ),
+          child: TextField(
+            controller: ctrl,
+            maxLength: 1, // ✅ SAMO JEDNA CIFRA
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly, // 🔥 SAMO BROJEVI
+            ],
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF00150A),
+            ),
+            decoration: const InputDecoration(
+              counterText: "",
+              hintText: "enter score",
+              hintStyle: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF22E58B),
+                letterSpacing: 1,
+              ),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+
+
+
+
+
+}
+

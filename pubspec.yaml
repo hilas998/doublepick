@@ -2,7 +2,7 @@ name: doublepick
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+28
+version: 1.0.0+100
 
 environment:
   sdk: ^3.9.2
@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
   google_mobile_ads: ^5.1.0
   cupertino_icons: ^1.0.8
   firebase_core: ^3.0.0
@@ -26,23 +25,19 @@ dependencies:
   sign_in_with_apple: ^6.0.0
   screenshot: ^2.1.0
 
-
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-
+  flutter_native_splash: ^2.4.7   # koristi verziju koja radi sa tvojim SDK-om
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.14.1  # ✅ Dodano ovdje
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/logo_firme.png
     - assets/images/lodoapp.png
-
+    - assets/images/slika1.png
 
 flutter_icons:
   android: true
@@ -50,3 +45,10 @@ flutter_icons:
   image_path: "assets/images/lodoapp.png"
   adaptive_icon_background: "#90EE90"
   adaptive_icon_foreground: "assets/images/lodoapp.png"
+
+flutter_native_splash:
+  android: true
+  ios: true
+  color: "#008000"                # zelena pozadina
+  image: "assets/images/slika1.png"
+

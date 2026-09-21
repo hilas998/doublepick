@@ -157,24 +157,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
         child: AdWidget(ad: _bannerAd!),
       ),
 
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF00150A),
-        centerTitle: true,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF44FF96)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'DoublePick',
-          style: TextStyle(
-            color: Color(0xFFEFFF8A),
-            fontWeight: FontWeight.w900,
-            fontSize: 24,
-            letterSpacing: 1,
-          ),
-        ),
-      ),
+
 
       body: Column(
         children: [
@@ -260,7 +243,7 @@ class _StandingsScreenState extends State<StandingsScreen> {
                   final isMe = user['uid'] == currentUserId;
 
                   return InkWell(
-                    onTap: () => Navigator.pushNamed(context, '/profile', arguments: user['uid']),
+                    onTap: () => Navigator.pushNamed(context, '/profileTrazenogKorisnika', arguments: user['uid']),
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -351,34 +334,6 @@ class _StandingsScreenState extends State<StandingsScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
-
-
-
-          // FAVORITES BUTTON
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/favorites'),
-            icon: const Icon(Icons.star_rounded, color: Colors.white),
-            label: const Text("MY FAVORITES"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // MY LEAGUES BUTTON
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/myLeagues'),
-            icon: const Icon(Icons.sports_soccer, color: Colors.white),
-            label: const Text("MY LEAGUES"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8CC0FF),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
 
           const SizedBox(height: 20),
         ],
