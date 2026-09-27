@@ -7,12 +7,14 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-
 import 'package:flutter/services.dart';
+
+
+
+
 
 
 
@@ -598,11 +600,12 @@ class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
     );
   }
 
-  void _initializeLocalNotifications() async {
+  Future<void> _initializeLocalNotifications() async {
     const AndroidInitializationSettings android =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings ios = DarwinInitializationSettings(
+    const DarwinInitializationSettings ios =
+    DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
@@ -613,13 +616,10 @@ class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
       iOS: ios,
     );
 
-    await _localNoti.initialize(settings);
-
-
-
+    await _localNoti.initialize(
+      settings: settings,
+    );
   }
-
-
 
 
 
@@ -708,21 +708,21 @@ class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
       priority: Priority.high,
     );
 
-    const details = NotificationDetails(android: androidDetails);
+    const details = NotificationDetails(
+      android: androidDetails,
+    );
 
     await _localNoti.zonedSchedule(
-      999, // ID
-      'Ad is available again!',
-      'Watch the ad and earn +2 points.',
-      tz.TZDateTime.from(time, tz.local),
-      details,
+      id: 999,
+      title: 'Ad is available again!',
+      body: 'Watch the ad and earn +2 points.',
+      scheduledDate: tz.TZDateTime.from(time, tz.local),
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: null,
+      payload: 'some_payload',
     );
   }
-
 
 
   void _startCountdown() {

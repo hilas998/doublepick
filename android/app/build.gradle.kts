@@ -20,6 +20,17 @@ android {
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
+    defaultConfig {
+        applicationId = "com.doublepick"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 37
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file(keystoreProperties["storeFile"] as String)
@@ -29,27 +40,12 @@ android {
         }
     }
 
-    defaultConfig {
-        applicationId = "com.doublepick"
-        minSdk = flutter.minSdkVersion
-        targetSdk =37
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
-        }
-    }
-
-
-
-
     buildTypes {
         getByName("debug") {
             isMinifyEnabled = false
             isShrinkResources = false
             isDebuggable = true
         }
-
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
@@ -58,13 +54,15 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
 
     packaging {
@@ -74,8 +72,11 @@ android {
     }
 }
 
+
+
+
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

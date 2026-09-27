@@ -129,24 +129,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final inviterSnap = await transaction.get(inviterRef);
       if (!inviterSnap.exists) return;
 
-      int currentScore = 0;
-      final scoreField = inviterSnap.data()?["score"];
-      if (scoreField is String) {
-        currentScore = int.tryParse(scoreField) ?? 0;
-      } else if (scoreField is int) {
-        currentScore = scoreField;
+      // trenutni score pozivaoca
+      int inviterScore = 0;
+      final inviterScoreField = inviterSnap.data()?["score"];
+      if (inviterScoreField is String) {
+        inviterScore = int.tryParse(inviterScoreField) ?? 0;
+      } else if (inviterScoreField is int) {
+        inviterScore = inviterScoreField;
       }
 
+      // trenutni score pozvanog
+      final inviteeSnap = await transaction.get(inviteeRef);
+      int inviteeScore = 0;
+      final inviteeScoreField = inviteeSnap.data()?["score"];
+      if (inviteeScoreField is String) {
+        inviteeScore = int.tryParse(inviteeScoreField) ?? 0;
+      } else if (inviteeScoreField is int) {
+        inviteeScore = inviteeScoreField;
+      }
+
+      // snimi referral zapis
       transaction.set(referralRecordRef, {
         "inviterId": referralUid,
         "inviteeId": newUserId,
         "timestamp": FieldValue.serverTimestamp(),
       });
 
-      transaction.update(inviterRef, {"score": (currentScore + 10).toString()});
+      // update pozivalac (+50)
+      transaction.update(inviterRef, {"score": (inviterScore + 50).toString()});
+
+      // update pozvani (+10)
       transaction.update(inviteeRef, {
         "referralUsed": true,
         "referredBy": referralUid,
+        "score": (inviteeScore + 10).toString(),
       });
     });
 

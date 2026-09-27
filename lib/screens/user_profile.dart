@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -250,35 +251,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     };
 
   }
-
   Future<void> _uploadProfileImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
     if (pickedFile == null) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('profile_images')
-        .child('${user.uid}.jpg');
+    final bytes = await File(pickedFile.path).readAsBytes();
+    final base64Image = base64Encode(bytes);
 
-    await storageRef.putFile(File(pickedFile.path));
-
-    final downloadUrl = await storageRef.getDownloadURL();
-
-    // spremi URL u Firestore
     await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'profileImage': downloadUrl,
-    });
-
-    setState(() {
-      // osvježi lokalno
+      'profileImageBase64': base64Image,
     });
   }
 
+
+  Future<void> _loadUpdatedUser() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
+    if (doc.exists) {
+      setState(() {
+        // osvježi lokalni user podatak
+        leagueRoundData?['profileImage'] = doc['profileImage'];
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -430,14 +428,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           child: CircleAvatar(
                             radius: 32,
                             backgroundColor: Colors.black,
-                            backgroundImage: u['profileImage'] != null
-                                ? NetworkImage(u['profileImage'])
+                            backgroundImage: u['profileImageBase64'] != null
+                                ? MemoryImage(base64Decode(u['profileImageBase64']))
                                 : null,
-                            child: u['profileImage'] == null
-                                ? const Icon(Icons.person,
-                                size: 40, color: Colors.white)
+                            child: u['profileImageBase64'] == null
+                                ? const Icon(Icons.person, size: 40, color: Colors.white)
                                 : null,
                           ),
+
                         ),
                         const SizedBox(height: 6),
                         TextButton.icon(
