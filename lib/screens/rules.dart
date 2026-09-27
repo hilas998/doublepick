@@ -138,6 +138,7 @@ class _RulesScreenState extends State<RulesScreen> {
                 "8️⃣ Each player can create only one league.\n\n"
 
                 "9️⃣ The app is intended for fun and entertainment only.\n\n"
+
                 "🔟 If a match is postponed, cancelled, or not played for any reason, the official result will be considered 10:10.\n\n",
                         style: TextStyle(
                           fontSize: 18,

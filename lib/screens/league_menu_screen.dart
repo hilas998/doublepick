@@ -25,6 +25,7 @@ class LeagueMenuScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF011F0A),
         centerTitle: true,
         elevation: 0,
+
         title: const Text(
           'DoublePick',
           style: TextStyle(

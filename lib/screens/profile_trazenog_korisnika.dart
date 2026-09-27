@@ -29,29 +29,14 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
   void initState() {
     super.initState();
     _loadRounds();
-    _loadInviteCode();
+
 
   }
 
 
-  Future<void> _loadInviteCode() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (doc.exists) {
-      setState(() {
-        inviteCode = doc['inviteCode'] ?? user.uid.substring(0, 6);
-      });
-    }
-  }
 
-  void _shareReferral() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final link =
-        "https://play.google.com/store/apps/details?id=com.doublepick&referrer=${user.uid}";
-    await Share.share("🎯 Join DoublePick and earn points!\n$link");
-  }
+
+
   Future<void> _loadUserLeagues(Map<String, dynamic> userData) async {
     final leaguesMap = Map<String, dynamic>.from(userData['leagues'] ?? {});
     setState(() {
@@ -64,80 +49,11 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
 
     if (selectedLeagueKey != null) {
       await _loadLeagueRounds(selectedLeagueKey!);
-      //await _loadProfileMatches(selectedLeagueKey!);
+
     }
   }
 
 
-
-  Future<void> _logout() async {
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Logout failed")),
-      );
-    }
-  }
-
-  Future<void> _deleteAccount() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Delete account"),
-        content: const Text(
-          "This will permanently delete your account and score. Continue?",
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final uid = user.uid;
-
-      // obriši Firestore podatke
-      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
-
-      // obriši auth nalog
-      await user.delete();
-
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Re-login required before deleting account")),
-      );
-    }
-  }
-
-  void _copyInviteCode() {
-    if (inviteCode.isEmpty) return;
-    Clipboard.setData(ClipboardData(text: inviteCode));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Invite code copied!")),
-    );
-  }
-
-  void _sendInviteCode() async {
-    if (inviteCode.isEmpty) return;
-    final message = "🎯 Join DoublePick! Use my invite code: $inviteCode";
-    await Share.share(message);
-  }
 
   Future<void> _loadLeagueRounds(String leagueKey) async {
     final snap = await FirebaseFirestore.instance
@@ -145,13 +61,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
         .doc(widget.uid)
         .collection('${leagueKey}tip1')
         .get();
-
-    setState(() {
-      leagueRounds = snap.docs.map((d) => d.id).toList();
-      if (leagueRounds.isNotEmpty) {
-        selectedLeagueRound = leagueRounds.first;
-      }
-    });
 
     if (snap.docs.isEmpty) {
       setState(() {
@@ -161,48 +70,39 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
       return;
     }
 
-    if (selectedLeagueRound != null) {
-      await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
-    }
+    // uzmi sve ID‑eve dokumenata
+    final allRounds = snap.docs.map((d) => d.id).toList();
+
+    setState(() {
+      leagueRounds = allRounds;
+      // 🔹 uzmi zadnji dokument iz liste
+      selectedLeagueRound = allRounds.last;
+    });
+
+
+
+    await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
   }
-  String _formatLeagueName(String key) {
-    // razdvoji po "_" i uzmi prvu riječ
-    final parts = key.split("_");
-    if (parts.isEmpty) return key;
-
-    // kapitaliziraj prvu riječ
-    final first = parts.first;
-    return first[0].toUpperCase() + first.substring(1).toLowerCase();
-  }
-
-
 
   Future<void> _loadLeagueRoundData(String leagueKey, String roundId) async {
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.uid)
-        .collection('${leagueKey}tip1')
+        .collection('${leagueKey}rounds')
         .doc(roundId)
         .get();
 
-
-
     final raw = Map<String, dynamic>.from(doc.data() ?? {});
+    final matches = Map<String, dynamic>.from(raw['matches'] ?? {});
 
-    // ⛔ filtriraj prazne / neodigrane mečeve
+    // filtriraj prazne / neodigrane mečeve
     final filtered = <String, dynamic>{};
-
-    raw.forEach((key, value) {
+    matches.forEach((key, value) {
       final m = Map<String, dynamic>.from(value);
-
-      if (
-      m['home'] != -1 &&
-          m['away'] != -1 &&
-          m['homeTeam'] != null &&
+      if (m['homeTeam'] != null &&
           m['awayTeam'] != null &&
           m['homeTeam'].toString().isNotEmpty &&
-          m['awayTeam'].toString().isNotEmpty
-      ) {
+          m['awayTeam'].toString().isNotEmpty) {
         filtered[key] = m;
       }
     });
@@ -210,11 +110,22 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
     setState(() {
       leagueRoundData = filtered;
     });
-
-
   }
 
 
+
+  String _formatLeagueName(String key) {
+    if (key.isEmpty) return key;
+
+    // razdvoji po "_" i kapitaliziraj svaku riječ
+    final parts = key.split("_");
+    final formatted = parts.map((p) {
+      if (p.isEmpty) return "";
+      return p[0].toUpperCase() + p.substring(1).toLowerCase();
+    }).join(" ");
+
+    return formatted;
+  }
 
 
   Future<void> _loadRounds() async {
@@ -227,6 +138,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
       if (list.isNotEmpty) selectedRound = list.last['roundNumber'];
     });
   }
+
 
   Future<Map<String, dynamic>?> _getUser() async {
     final doc = await FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
@@ -248,6 +160,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
     };
 
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +186,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
           ),
         ),
       ),
-
 
       body: FutureBuilder<Map<String, dynamic>?>(
         future: _getUser(),
@@ -416,7 +328,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
                 _divider(),
 
 
-                const SizedBox(height: 12),
                 const Text(
                   "Recent Predictions",
                   style: TextStyle(
@@ -433,11 +344,30 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
                 const SizedBox(height: 12),
               ],
             ),
+
           ),
         ),
       ),
     );
   }
+
+  Widget _menuTile(BuildContext context, String text, IconData icon, String route,
+      {bool danger = false, Color textColor = Colors.white}) {
+    return ListTile(
+      leading: Icon(icon, color: danger ? Colors.red : Colors.greenAccent),
+      title: Text(
+        text,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: () {
+        Navigator.pushNamed(context, route);
+      },
+    );
+  }
+
 
   Widget _matchCard(String matchTitle, dynamic home, dynamic away) {
     return Container(
@@ -500,9 +430,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
       ),
     );
   }
-
   Widget _leagueHistory(Map<String, dynamic> userData) {
-
     if (userLeagues.isEmpty) {
       return const Text(
         "No league history yet",
@@ -547,8 +475,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
           }).toList(),
         ),
 
-
-
         const SizedBox(height: 10),
 
         /// ROUND DROPDOWN
@@ -556,7 +482,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
           DropdownButton<String>(
             value: selectedLeagueRound,
             dropdownColor: const Color(0xFF112309),
-            alignment: Alignment.centerLeft, // lijevo poravnanje
+            alignment: Alignment.centerLeft,
             onChanged: (val) async {
               if (val == null) return;
               setState(() => selectedLeagueRound = val);
@@ -565,31 +491,98 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
               }
             },
             items: leagueRounds.map((r) {
-              final roundNumber = r.replaceAll(RegExp(r'[^0-9]'), ''); // izvadi broj iz stringa
+              final roundNumber = r.replaceAll(RegExp(r'[^0-9]'), '');
               return DropdownMenuItem<String>(
                 value: r,
-                child: Text("Round $roundNumber", style: const TextStyle(color: Colors.yellow)),
+                child: Text("Round $roundNumber",
+                    style: const TextStyle(color: Colors.yellow)),
               );
             }).toList(),
           ),
 
-
         const SizedBox(height: 12),
 
         if (leagueRoundData != null)
-          ...leagueRoundData!.entries.map((e) {
-            final m = Map<String, dynamic>.from(e.value);
-            return Card(
-              child: ListTile(
-                title: Text("${m['homeTeam']} vs ${m['awayTeam']}"),
-                subtitle: Text("Your tip: ${m['home']} : ${m['away']}"),
-                trailing: Text("Result: ${m['resHome']} : ${m['resAway']}"),
-              ),
-            );
-          }).toList(),
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.greenAccent.withOpacity(0.3),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "League Round",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // sve utakmice u jednom cardu
+                ...leagueRoundData!.entries.map((e) {
+                  final m = Map<String, dynamic>.from(e.value);
+                  return Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("${m['homeTeam']} vs ${m['awayTeam']}",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          Text("Score: ${m['resHome']} : ${m['resAway']}"),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Your Tip: ${m['tipHome']} : ${m['tipAway']}"),
+                          Text("${m['points'] ?? 0} pts",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87)),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Colors.black54),
+                    ],
+                  );
+                }).toList(),
+
+                // 🔹 Total bodova na kraju
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    "Total: ${leagueRoundData!.entries.fold<int>(0, (sum, e) {
+                      final m = Map<String, dynamic>.from(e.value);
+                      return sum + (int.tryParse(m['points']?.toString() ?? '0') ?? 0);
+                    })} pts",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
+
+
+
 
   Widget _roundHistory() {
     if (roundsList.isEmpty) return const Text("No rounds played yet", style: TextStyle(color: Colors.white));
@@ -601,7 +594,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
         const Text("Round History", style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900,  color: Color(0xFF44FF96))),
         const SizedBox(height: 12),
         DropdownButton<int>(
-          value: selectedRound, // varijabla koja drži trenutno odabrano kolo
+          value: selectedRound,
           dropdownColor: const Color(0xFF112309),
           onChanged: (int? newValue) {
             if (newValue != null) {
@@ -611,10 +604,12 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
             }
           },
           items: roundsList.map<DropdownMenuItem<int>>((r) {
-            final num = r['roundNumber'] as int; // cast u int
+            final num = r['roundNumber'] as int;
+            // 🔹 bez zagrada
+            final label = (num == selectedRound) ? "Round $num" : "Round $num";
             return DropdownMenuItem<int>(
               value: num,
-              child: Text("Round $num", style: const TextStyle(color: Colors.yellow)),
+              child: Text(label, style: const TextStyle(color: Colors.yellow)),
             );
           }).toList(),
         ),
@@ -644,7 +639,7 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Round ${userData['roundNumber'] ?? ''}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          //Text("Round ${userData['roundNumber'] ?? ''}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
           // Meč 1
@@ -726,54 +721,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
   }
 
 
-  Widget _roundMatchRow({
-    required dynamic teamHome,
-    required dynamic teamAway,
-    required dynamic resultHome,
-    required dynamic resultAway,
-    required dynamic tipHome,
-    required dynamic tipAway,
-    required int points,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(child: Text("$teamHome - $teamAway", style: const TextStyle(fontWeight: FontWeight.bold))),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text("Score: $resultHome:$resultAway"),
-            Text("Your Tip: $tipHome:$tipAway"),
-            Text("$points points", style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _profileHeader(dynamic u) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(colors: [Color(0xFF00FF88), Color(0xFF00994C)]),
-          ),
-          child: const CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.black,
-            child: Icon(Icons.person, size: 40, color: Colors.white),
-          ),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Text("${u['ime'] ?? ''} ${u['prezime'] ?? ''}",
-              style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: Colors.black)),
-        ),
-      ],
-    );
-  }
 
   Widget _infoLine({
     required IconData icon,
@@ -821,4 +768,6 @@ class _ProfileTrazenogKorisnikaScreenState extends State<ProfileTrazenogKorisnik
   }
 
 
+
 }
+

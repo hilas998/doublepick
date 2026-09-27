@@ -321,7 +321,6 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
 
     print("League ${widget.leagueName} standings saved!");
   }
-
   Future<void> _calculateRound(BuildContext context) async {
     final db = FirebaseFirestore.instance;
     final leagueKey = widget.leagueName.toLowerCase().replaceAll(' ', '');
@@ -331,6 +330,7 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
 
     final matchesData = Map<String, dynamic>.from(leagueDoc.data()!['matches'] ?? {});
 
+    // stvarni rezultati mečeva
     final realMatches = matchesData.entries.map((e) {
       final m = Map<String, dynamic>.from(e.value);
       return {
@@ -357,11 +357,11 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
       final roundNumber = existingRounds.docs.length + 1;
       final roundDocId = 'round$roundNumber';
 
-      // --- Uzmi korisničke tipove ---
+      // --- Uzmi korisničke tipove (ako postoje) ---
       final unsentDocSnap = await unsentColRef.doc('round1').get();
-      if (!unsentDocSnap.exists) continue;
-
-      final unsentData = Map<String, dynamic>.from(unsentDocSnap.data()?['matches'] ?? {});
+      final unsentData = unsentDocSnap.exists
+          ? Map<String, dynamic>.from(unsentDocSnap.data()?['matches'] ?? {})
+          : {};
 
       final Map<String, dynamic> newRoundData = {};
       int roundScore = 0;
@@ -375,17 +375,8 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
         final hR = match['resHome'];
         final aR = match['resAway'];
 
-        int matchPoints = 0;
-
-        if (hT != -1 && aT != -1 && hR != -1 && aR != -1) {
-          if (hT == hR && aT == aR) {
-            matchPoints = 10;
-          } else if (_sameOutcome(hT, aT, hR, aR)) {
-            matchPoints = 2;
-          }
-        }
-
-        // ✅ saberi bodove samo jednom
+        // helper za bodovanje
+        int matchPoints = _calculateMatchPoints(hT, aT, hR, aR);
         roundScore += matchPoints;
 
         newRoundData[matchId] = {
@@ -395,11 +386,11 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
           'resAway': aR,
           'homeTeam': match['homeTeam'],
           'awayTeam': match['awayTeam'],
-          'points': matchPoints, // bodovi po meču
+          'points': matchPoints,
         };
       }
 
-      // --- Spremi novu rundu u ligu ---
+      // --- Spremi rundu u tip1 kolekciju ---
       await tipColRef.doc(roundDocId).set(newRoundData);
 
       // --- Spremi i u podkolekciju kod korisnika ---
@@ -409,7 +400,7 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
           .set({
         'roundNumber': roundNumber,
         'matches': newRoundData,
-        'points': roundScore, // ukupni bodovi
+        'points': roundScore,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -434,6 +425,13 @@ class _LeagueScreenGlobalState extends State<LeagueScreenGlobal> {
     await _saveLeagueStandings();
   }
 
+// ✅ helper za bodovanje
+  int _calculateMatchPoints(int hT, int aT, int hR, int aR) {
+    if (hT == -1 || aT == -1 || hR == -1 || aR == -1) return 0;
+    if (hT == hR && aT == aR) return 10;
+    if (_sameOutcome(hT, aT, hR, aR)) return 2;
+    return 0;
+  }
 
 
   bool _sameOutcome(int a, int b, int x, int y) {

@@ -113,7 +113,7 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
       });
     });
 
-    _msg("✅ Success! You received 5 points");
+    _msg("✅ Success! You received 50 points");
     Navigator.pushReplacementNamed(context, '/home');
   }
 

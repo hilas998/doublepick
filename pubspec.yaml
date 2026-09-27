@@ -2,7 +2,7 @@ name: doublepick
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+100
+version: 1.0.0+102
 
 environment:
   sdk: ^3.9.2
@@ -10,20 +10,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_mobile_ads: ^5.1.0
   cupertino_icons: ^1.0.8
-  firebase_core: ^3.0.0
-  firebase_messaging: ^15.0.0
-  firebase_auth: ^5.2.0
-  cloud_firestore: ^5.4.0
   shared_preferences: ^2.3.0
-  share_plus: ^10.1.4
-  connectivity_plus: ^6.1.0
-  flutter_local_notifications: ^17.1.0
-  device_info_plus: ^10.1.0
-  permission_handler: ^11.0.1
   sign_in_with_apple: ^6.0.0
-  screenshot: ^2.1.0
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
+  firebase_storage: ^13.6.0
+  firebase_messaging: ^16.7.0
+  google_mobile_ads: ^9.1.0
+  connectivity_plus: ^7.3.1
+  permission_handler: ^13.0.2
+  screenshot: ^3.0.0
+  flutter_local_notifications: ^22.3.1
+  image_picker: ^1.2.3
+  device_info_plus: ^13.2.0
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

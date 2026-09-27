@@ -17,9 +17,10 @@ class _MyLeaguesFavoritesScreenState extends State<MyLeaguesFavoritesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF00150A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF00150A),
+        backgroundColor: const Color(0xFF011F0A),
         centerTitle: true,
         elevation: 0,
+
         title: const Text(
           'DoublePick',
           style: TextStyle(

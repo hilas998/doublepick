@@ -17,7 +17,7 @@ plugins {
 
 android {
     namespace = "com.doublepick"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     signingConfigs {
@@ -32,7 +32,7 @@ android {
     defaultConfig {
         applicationId = "com.doublepick"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk =37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {

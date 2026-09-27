@@ -320,34 +320,26 @@ class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    // uzmi zadnji dokument iz users/{uid}/rounds
-    final snap = await _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('rounds')
-        .orderBy('roundNumber', descending: true)
-        .limit(1)
-        .get();
+    // uzmi broj zadnjeg kola iz meta/config
+    final metaDoc = await _firestore.collection('meta').doc('config').get();
+    final lastRound = metaDoc.data()?['currentRound'] ?? 0;
 
-    if (snap.docs.isEmpty) return;
+    // povuci globalni dokument rounds/round_X
+    final roundDoc = await _firestore.collection('rounds').doc('round_$lastRound').get();
+    if (!roundDoc.exists) return;
 
-    final data = snap.docs.first.data();
+    final data = roundDoc.data()!;
+    final timovi = Map<String, dynamic>.from(data['timovi'] ?? {});
+    final rezultati = Map<String, dynamic>.from(data['stvarniRezultati'] ?? {});
 
-    final timovi = (data['timovi'] != null)
-        ? Map<String, dynamic>.from(data['timovi'])
-        : {};
+    // pronađi trenutnog korisnika u users arrayu
+    final usersRaw = data['users'] as List<dynamic>? ?? [];
+    final myData = usersRaw.firstWhere(
+          (u) => u['uid'] == uid,
+      orElse: () => null,
+    );
 
-    final rezultati = (data['stvarniRezultati'] != null)
-        ? Map<String, dynamic>.from(data['stvarniRezultati'])
-        : {};
-
-    final userTips = (data['userTips'] != null)
-        ? Map<String, dynamic>.from(data['userTips'])
-        : {};
-
-    final points = (data['points'] != null)
-        ? Map<String, dynamic>.from(data['points'])
-        : {};
+    if (myData == null) return;
 
     setState(() {
       lastRoundMatches = [
@@ -356,23 +348,23 @@ class _BonusGameMenuScreenState extends State<BonusGameMenuScreen>
           'awayTeam': timovi['team2'] ?? '',
           'resHome': rezultati['r1'] ?? '',
           'resAway': rezultati['r2'] ?? '',
-          'tipHome': userTips['tip1'] ?? '',
-          'tipAway': userTips['tip2'] ?? '',
-          'points': points['m1'] ?? 0,
+          'tipHome': myData['tip1'] ?? '',
+          'tipAway': myData['tip2'] ?? '',
+          'points': myData['m1'] ?? 0,
         },
         {
           'homeTeam': timovi['team3'] ?? '',
           'awayTeam': timovi['team4'] ?? '',
           'resHome': rezultati['r3'] ?? '',
           'resAway': rezultati['r4'] ?? '',
-          'tipHome': userTips['tip3'] ?? '',
-          'tipAway': userTips['tip4'] ?? '',
-          'points': points['m2'] ?? 0,
+          'tipHome': myData['tip3'] ?? '',
+          'tipAway': myData['tip4'] ?? '',
+          'points': myData['m2'] ?? 0,
         },
       ];
     });
-
   }
+
 
   void _startTimer() {
     if (startTime <= 0 || globalEndTime <= 0 || scoreCalcEndTime <= 0) {

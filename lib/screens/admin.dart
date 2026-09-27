@@ -22,9 +22,6 @@ class AdminScreen extends StatelessWidget {
 
     return admins.contains(user.email);
   }
-  // ================================
-  //        CALCULATE ROUND
-  // ================================
   Future<void> _calculateRound(BuildContext context) async {
     final db = FirebaseFirestore.instance;
 
@@ -32,17 +29,10 @@ class AdminScreen extends StatelessWidget {
     if (!roundDoc.exists) return;
 
     final r = roundDoc.data()!;
-    final rez = [
-      r['stvarnirezultat1'],
-      r['stvarnirezultat2'],
-      r['stvarnirezultat3'],
-      r['stvarnirezultat4'],
-    ];
+    final rez = [r['stvarnirezultat1'], r['stvarnirezultat2'], r['stvarnirezultat3'], r['stvarnirezultat4']];
 
     if (rez.any((e) => e == null || e.toString().isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Unesi sve rezultate!")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Unesi sve rezultate!")));
       return;
     }
 
@@ -61,23 +51,15 @@ class AdminScreen extends StatelessWidget {
     for (var doc in usersSnap.docs) {
       final d = doc.data();
 
-      String t1 = d['tip1']?.toString() ?? "";
-      String t2 = d['tip2']?.toString() ?? "";
-      String t3 = d['tip3']?.toString() ?? "";
-      String t4 = d['tip4']?.toString() ?? "";
+      int tip1 = int.tryParse(d['tip1']?.toString() ?? '') ?? -1;
+      int tip2 = int.tryParse(d['tip2']?.toString() ?? '') ?? -1;
+      int tip3 = int.tryParse(d['tip3']?.toString() ?? '') ?? -1;
+      int tip4 = int.tryParse(d['tip4']?.toString() ?? '') ?? -1;
 
-      int tip1 = t1.isNotEmpty ? int.parse(t1) : -1;
-      int tip2 = t2.isNotEmpty ? int.parse(t2) : -1;
-      int tip3 = t3.isNotEmpty ? int.parse(t3) : -1;
-      int tip4 = t4.isNotEmpty ? int.parse(t4) : -1;
-
-      int m1 = 0;
-      int m2 = 0;
-
+      int m1 = 0, m2 = 0;
       if ([tip1, tip2, tip3, tip4].every((e) => e != -1)) {
         bool exact1 = tip1 == r1 && tip2 == r2;
         bool exact2 = tip3 == r3 && tip4 == r4;
-
         bool outcome1 = _sameOutcome(tip1, tip2, r1, r2);
         bool outcome2 = _sameOutcome(tip3, tip4, r3, r4);
 
@@ -89,55 +71,55 @@ class AdminScreen extends StatelessWidget {
       if (m1 == 20 && m2 == 20) total += 20;
 
       int global = int.tryParse(d['score'] ?? '0') ?? 0;
-      await doc.reference.update({
-        'score': (global + total).toString(),
-      });
+      await doc.reference.update({'score': (global + total).toString()});
 
+      // Snimi u podkolekciju kod korisnika
       await doc.reference.collection('rounds').doc('round_$roundNumber').set({
         'roundNumber': roundNumber,
-        'timovi': {
-          'team1': r['team1'] ?? '',
-          'team2': r['team2'] ?? '',
-          'team3': r['team3'] ?? '',
-          'team4': r['team4'] ?? '',
-        },
+        'timovi': {'team1': r['team1'] ?? '', 'team2': r['team2'] ?? '', 'team3': r['team3'] ?? '', 'team4': r['team4'] ?? ''},
         'stvarniRezultati': {'r1': r1, 'r2': r2, 'r3': r3, 'r4': r4},
         'userTips': {'tip1': tip1, 'tip2': tip2, 'tip3': tip3, 'tip4': tip4},
         'points': {'m1': m1, 'm2': m2, 'total': total},
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Dodaj korisnika u standings
+      // Dodaj u globalni standings
       standings.add({
         'uid': doc.id,
         'ime': d['ime'] ?? '',
         'prezime': d['prezime'] ?? '',
+        'tip1': tip1,
+        'tip2': tip2,
+        'tip3': tip3,
+        'tip4': tip4,
+        'm1': m1,
+        'm2': m2,
         'total': total,
       });
+
     }
 
-    // 🔹 Sortiraj i snimi globalno tek nakon što se svi obrade
+
+
     standings.sort((a, b) => b['total'].compareTo(a['total']));
 
     await db.collection('rounds').doc('round_$roundNumber').set({
       'roundNumber': roundNumber,
       'createdAt': FieldValue.serverTimestamp(),
       'stvarniRezultati': {'r1': r1, 'r2': r2, 'r3': r3, 'r4': r4},
-      'timovi': {
-        'team1': r['team1'] ?? '',
-        'team2': r['team2'] ?? '',
-        'team3': r['team3'] ?? '',
-        'team4': r['team4'] ?? '',
-      },
+      'timovi': {'team1': r['team1'] ?? '', 'team2': r['team2'] ?? '', 'team3': r['team3'] ?? '', 'team4': r['team4'] ?? ''},
       'users': standings,
     });
 
     await metaRef.set({'currentRound': roundNumber});
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Round $roundNumber spremljen!")),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Round $roundNumber spremljen!")));
   }
+
+
+
+
+
 
   bool _sameOutcome(int a, int b, int x, int y) {
     // Računa rezultat: da li je ishod isti

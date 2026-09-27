@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String uid;
@@ -139,19 +142,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     await Share.share(message);
   }
 
+
+
+
+
   Future<void> _loadLeagueRounds(String leagueKey) async {
     final snap = await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.uid)
         .collection('${leagueKey}tip1')
         .get();
-
-    setState(() {
-      leagueRounds = snap.docs.map((d) => d.id).toList();
-      if (leagueRounds.isNotEmpty) {
-        selectedLeagueRound = leagueRounds.first;
-      }
-    });
 
     if (snap.docs.isEmpty) {
       setState(() {
@@ -161,48 +161,40 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       return;
     }
 
-    if (selectedLeagueRound != null) {
-      await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
-    }
-  }
-  String _formatLeagueName(String key) {
-    // razdvoji po "_" i uzmi prvu riječ
-    final parts = key.split("_");
-    if (parts.isEmpty) return key;
+    // uzmi sve ID‑eve dokumenata
+    final allRounds = snap.docs.map((d) => d.id).toList();
 
-    // kapitaliziraj prvu riječ
-    final first = parts.first;
-    return first[0].toUpperCase() + first.substring(1).toLowerCase();
-  }
+    setState(() {
+      leagueRounds = allRounds;
+      // 🔹 uzmi zadnji dokument iz liste
+      selectedLeagueRound = allRounds.last;
+    });
 
+
+
+    await _loadLeagueRoundData(leagueKey, selectedLeagueRound!);
+  }
 
 
   Future<void> _loadLeagueRoundData(String leagueKey, String roundId) async {
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.uid)
-        .collection('${leagueKey}tip1')
+        .collection('${leagueKey}rounds')
         .doc(roundId)
         .get();
 
-
-
     final raw = Map<String, dynamic>.from(doc.data() ?? {});
+    final matches = Map<String, dynamic>.from(raw['matches'] ?? {});
 
-    // ⛔ filtriraj prazne / neodigrane mečeve
+    // filtriraj prazne / neodigrane mečeve
     final filtered = <String, dynamic>{};
-
-    raw.forEach((key, value) {
+    matches.forEach((key, value) {
       final m = Map<String, dynamic>.from(value);
-
-      if (
-      m['home'] != -1 &&
-          m['away'] != -1 &&
-          m['homeTeam'] != null &&
+      if (m['homeTeam'] != null &&
           m['awayTeam'] != null &&
           m['homeTeam'].toString().isNotEmpty &&
-          m['awayTeam'].toString().isNotEmpty
-      ) {
+          m['awayTeam'].toString().isNotEmpty) {
         filtered[key] = m;
       }
     });
@@ -210,11 +202,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     setState(() {
       leagueRoundData = filtered;
     });
-
-
   }
 
+  String _formatLeagueName(String key) {
+    if (key.isEmpty) return key;
 
+    // razdvoji po "_" i kapitaliziraj svaku riječ
+    final parts = key.split("_");
+    final formatted = parts.map((p) {
+      if (p.isEmpty) return "";
+      return p[0].toUpperCase() + p.substring(1).toLowerCase();
+    }).join(" ");
+
+    return formatted;
+  }
 
 
   Future<void> _loadRounds() async {
@@ -227,6 +228,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       if (list.isNotEmpty) selectedRound = list.last['roundNumber'];
     });
   }
+
 
   Future<Map<String, dynamic>?> _getUser() async {
     final doc = await FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
@@ -248,6 +250,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     };
 
   }
+
+  Future<void> _uploadProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile == null) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('profile_images')
+        .child('${user.uid}.jpg');
+
+    await storageRef.putFile(File(pickedFile.path));
+
+    final downloadUrl = await storageRef.getDownloadURL();
+
+    // spremi URL u Firestore
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      'profileImage': downloadUrl,
+    });
+
+    setState(() {
+      // osvježi lokalno
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -356,7 +387,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-
   Widget _profileCard(dynamic u) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -387,19 +417,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 // ===== PROFILE HEADER =====
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00FF88), Color(0xFF00994C)],
+                    Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF00FF88), Color(0xFF00994C)],
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: Colors.black,
+                            backgroundImage: u['profileImage'] != null
+                                ? NetworkImage(u['profileImage'])
+                                : null,
+                            child: u['profileImage'] == null
+                                ? const Icon(Icons.person,
+                                size: 40, color: Colors.white)
+                                : null,
+                          ),
                         ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 32,
-                        backgroundColor: Colors.black,
-                        child: const Icon(Icons.person, size: 40, color: Colors.white),
-                      ),
+                        const SizedBox(height: 6),
+                        TextButton.icon(
+                          onPressed: _uploadProfileImage,
+                          icon: const Icon(Icons.camera_alt, color: Colors.green),
+                          label: const Text("Change Photo"),
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -438,7 +484,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                 const SizedBox(height: 16),
                 _divider(),
-                // 🔹 Novi dio: Invite + Share
+
+                // 🔹 Invite + Share
                 const SizedBox(height: 12),
                 Text("Invite Code: $inviteCode",
                     style: const TextStyle(
@@ -446,7 +493,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         fontWeight: FontWeight.bold,
                         color: Colors.black)),
                 const SizedBox(height: 10),
-
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -472,23 +518,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
 
-
-
-                Column(
-                  children: [
-
-                    // 👇 Admin panel samo za određenog korisnika
-                    if ((FirebaseAuth.instance.currentUser?.email ?? "") == "salihlihic998@gmail.com")
-                      _menuTile(
-                        context,
-                        "Admin panel",
-                        Icons.admin_panel_settings,
-                        '/admin',
-                        danger: true,
-                        textColor: Colors.red,
-                      ),
-                  ],
-                ),
+                // 👇 Admin panel samo za određenog korisnika
+                if ((FirebaseAuth.instance.currentUser?.email ?? "") ==
+                    "salihlihic998@gmail.com")
+                  _menuTile(
+                    context,
+                    "Admin panel",
+                    Icons.admin_panel_settings,
+                    '/admin',
+                    danger: true,
+                    textColor: Colors.red,
+                  ),
 
                 ElevatedButton.icon(
                   onPressed: _shareReferral,
@@ -520,12 +560,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 const SizedBox(height: 12),
               ],
             ),
-
           ),
         ),
       ),
     );
   }
+
 
   Widget _menuTile(BuildContext context, String text, IconData icon, String route,
       {bool danger = false, Color textColor = Colors.white}) {
@@ -606,9 +646,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ),
     );
   }
-
   Widget _leagueHistory(Map<String, dynamic> userData) {
-
     if (userLeagues.isEmpty) {
       return const Text(
         "No league history yet",
@@ -653,8 +691,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           }).toList(),
         ),
 
-
-
         const SizedBox(height: 10),
 
         /// ROUND DROPDOWN
@@ -662,7 +698,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           DropdownButton<String>(
             value: selectedLeagueRound,
             dropdownColor: const Color(0xFF112309),
-            alignment: Alignment.centerLeft, // lijevo poravnanje
+            alignment: Alignment.centerLeft,
             onChanged: (val) async {
               if (val == null) return;
               setState(() => selectedLeagueRound = val);
@@ -671,31 +707,96 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               }
             },
             items: leagueRounds.map((r) {
-              final roundNumber = r.replaceAll(RegExp(r'[^0-9]'), ''); // izvadi broj iz stringa
+              final roundNumber = r.replaceAll(RegExp(r'[^0-9]'), '');
               return DropdownMenuItem<String>(
                 value: r,
-                child: Text("Round $roundNumber", style: const TextStyle(color: Colors.yellow)),
+                child: Text("Round $roundNumber",
+                    style: const TextStyle(color: Colors.yellow)),
               );
             }).toList(),
           ),
 
-
         const SizedBox(height: 12),
 
         if (leagueRoundData != null)
-          ...leagueRoundData!.entries.map((e) {
-            final m = Map<String, dynamic>.from(e.value);
-            return Card(
-              child: ListTile(
-                title: Text("${m['homeTeam']} vs ${m['awayTeam']}"),
-                subtitle: Text("Your tip: ${m['home']} : ${m['away']}"),
-                trailing: Text("Result: ${m['resHome']} : ${m['resAway']}"),
-              ),
-            );
-          }).toList(),
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.greenAccent.withOpacity(0.3),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "League Round",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // sve utakmice u jednom cardu
+                ...leagueRoundData!.entries.map((e) {
+                  final m = Map<String, dynamic>.from(e.value);
+                  return Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("${m['homeTeam']} vs ${m['awayTeam']}",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          Text("Score: ${m['resHome']} : ${m['resAway']}"),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Your Tip: ${m['tipHome']} : ${m['tipAway']}"),
+                          Text("${m['points'] ?? 0} pts",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87)),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Colors.black54),
+                    ],
+                  );
+                }).toList(),
+
+                // 🔹 Total bodova na kraju
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    "Total: ${leagueRoundData!.entries.fold<int>(0, (sum, e) {
+                      final m = Map<String, dynamic>.from(e.value);
+                      return sum + (int.tryParse(m['points']?.toString() ?? '0') ?? 0);
+                    })} pts",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
+
 
   Widget _roundHistory() {
     if (roundsList.isEmpty) return const Text("No rounds played yet", style: TextStyle(color: Colors.white));
@@ -707,7 +808,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         const Text("Round History", style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900,  color: Color(0xFF44FF96))),
         const SizedBox(height: 12),
         DropdownButton<int>(
-          value: selectedRound, // varijabla koja drži trenutno odabrano kolo
+          value: selectedRound,
           dropdownColor: const Color(0xFF112309),
           onChanged: (int? newValue) {
             if (newValue != null) {
@@ -717,10 +818,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             }
           },
           items: roundsList.map<DropdownMenuItem<int>>((r) {
-            final num = r['roundNumber'] as int; // cast u int
+            final num = r['roundNumber'] as int;
+            // 🔹 bez zagrada
+            final label = (num == selectedRound) ? "Round $num" : "Round $num";
             return DropdownMenuItem<int>(
               value: num,
-              child: Text("Round $num", style: const TextStyle(color: Colors.yellow)),
+              child: Text(label, style: const TextStyle(color: Colors.yellow)),
             );
           }).toList(),
         ),
@@ -750,7 +853,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Round ${userData['roundNumber'] ?? ''}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          //Text("Round ${userData['roundNumber'] ?? ''}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
           // Meč 1
@@ -832,54 +935,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
 
-  Widget _roundMatchRow({
-    required dynamic teamHome,
-    required dynamic teamAway,
-    required dynamic resultHome,
-    required dynamic resultAway,
-    required dynamic tipHome,
-    required dynamic tipAway,
-    required int points,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(child: Text("$teamHome - $teamAway", style: const TextStyle(fontWeight: FontWeight.bold))),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text("Score: $resultHome:$resultAway"),
-            Text("Your Tip: $tipHome:$tipAway"),
-            Text("$points points", style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _profileHeader(dynamic u) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(colors: [Color(0xFF00FF88), Color(0xFF00994C)]),
-          ),
-          child: const CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.black,
-            child: Icon(Icons.person, size: 40, color: Colors.white),
-          ),
-        ),
-        const SizedBox(width: 18),
-        Expanded(
-          child: Text("${u['ime'] ?? ''} ${u['prezime'] ?? ''}",
-              style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: Colors.black)),
-        ),
-      ],
-    );
-  }
 
   Widget _infoLine({
     required IconData icon,
