@@ -251,32 +251,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     };
 
   }
-  Future<void> _uploadProfileImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final bytes = await File(pickedFile.path).readAsBytes();
-    final base64Image = base64Encode(bytes);
-
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'profileImageBase64': base64Image,
-    });
-  }
 
 
-  Future<void> _loadUpdatedUser() async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
-    if (doc.exists) {
-      setState(() {
-        // osvježi lokalni user podatak
-        leagueRoundData?['profileImage'] = doc['profileImage'];
-      });
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -428,21 +405,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           child: CircleAvatar(
                             radius: 32,
                             backgroundColor: Colors.black,
-                            backgroundImage: u['profileImageBase64'] != null
-                                ? MemoryImage(base64Decode(u['profileImageBase64']))
-                                : null,
-                            child: u['profileImageBase64'] == null
-                                ? const Icon(Icons.person, size: 40, color: Colors.white)
-                                : null,
+                            child: const Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Colors.white,
+                            ),
                           ),
 
                         ),
-                        const SizedBox(height: 6),
-                        TextButton.icon(
-                          onPressed: _uploadProfileImage,
-                          icon: const Icon(Icons.camera_alt, color: Colors.green),
-                          label: const Text("Change Photo"),
-                        ),
+
                       ],
                     ),
                     const SizedBox(width: 16),
